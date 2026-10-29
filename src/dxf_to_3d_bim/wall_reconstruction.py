@@ -48,6 +48,7 @@ class WallReconstructor:
         default_interior_thickness: float = 100.0,
         default_height: float = 3000.0,
         endpoint_snap_tolerance: float = 50.0,
+        min_wall_length: float = 100.0,
     ):
         self.min_thickness = min_thickness
         self.max_thickness = max_thickness
@@ -55,6 +56,7 @@ class WallReconstructor:
         self.default_interior_thickness = default_interior_thickness
         self.default_height = default_height
         self.endpoint_snap_tolerance = endpoint_snap_tolerance
+        self.min_wall_length = min_wall_length
 
     def reconstruct(
         self,
@@ -95,7 +97,68 @@ class WallReconstructor:
 
         # Snap junctions across all walls
         reconstructed = self._snap_wall_network(reconstructed)
+
+        # Merge collinear segments separated by door/window opening breaks
+        reconstructed = self._merge_collinear_walls(reconstructed)
+
+        # Filter out degenerate or too-short wall segments (e.g. collapsed jamb lines)
+        reconstructed = [w for w in reconstructed if w.length >= self.min_wall_length]
+
+        # Re-index wall IDs cleanly
+        for idx, w in enumerate(reconstructed, start=1):
+            w.id = f"wall_{idx}"
+
         return reconstructed
+
+    def _dist_point_to_infinite_line(self, pt: Tuple[float, float], s: Tuple[float, float], e: Tuple[float, float]) -> float:
+        x0, y0 = pt
+        x1, y1 = s
+        x2, y2 = e
+        dx, dy = x2 - x1, y2 - y1
+        l = math.hypot(dx, dy)
+        if l == 0:
+            return distance_point_to_point(pt, s)
+        return abs(dy * x0 - dx * y0 + x2 * y1 - y2 * x1) / l
+
+    def _merge_collinear_walls(self, walls: List[ReconstructedWall], max_gap: float = 2200.0) -> List[ReconstructedWall]:
+        """Merges collinear wall segments interrupted by door or window gaps."""
+        filtered = [x for x in walls if x.length > 250.0]
+        merged = list(filtered)
+        changed = True
+        while changed:
+            changed = False
+            n = len(merged)
+            for i in range(n):
+                if changed:
+                    break
+                for j in range(i + 1, n):
+                    w1, w2 = merged[i], merged[j]
+                    if w1.classification != w2.classification:
+                        continue
+                    if not are_lines_parallel(w1.start, w1.end, w2.start, w2.end):
+                        continue
+                    dist = self._dist_point_to_infinite_line(w2.start, w1.start, w1.end)
+                    if dist > 35.0:
+                        continue
+                    d1 = distance_point_to_point(w1.end, w2.start)
+                    d2 = distance_point_to_point(w1.start, w2.end)
+                    d3 = distance_point_to_point(w1.start, w2.start)
+                    d4 = distance_point_to_point(w1.end, w2.end)
+                    if min(d1, d2, d3, d4) <= max_gap:
+                        vx, vy = w1.end[0] - w1.start[0], w1.end[1] - w1.start[1]
+                        vl = math.hypot(vx, vy)
+                        if vl == 0:
+                            continue
+                        ux, uy = vx / vl, vy / vl
+                        all_pts = [w1.start, w1.end, w2.start, w2.end]
+                        projs = [(pt[0] * ux + pt[1] * uy, pt) for pt in all_pts]
+                        projs.sort(key=lambda x: x[0])
+                        w1.start = projs[0][1]
+                        w1.end = projs[-1][1]
+                        merged.pop(j)
+                        changed = True
+                        break
+        return merged
 
     def _reconstruct_group(
         self,

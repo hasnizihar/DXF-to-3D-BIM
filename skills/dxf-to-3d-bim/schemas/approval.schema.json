@@ -10,6 +10,9 @@
     "status": { "type": "string", "enum": ["approved", "rejected", "pending"] },
     "approvedBy": { "type": "string" },
     "timestamp": { "type": "string" },
+    "dxfHash": { "type": "string" },
+    "configHash": { "type": "string" },
+    "approvalMethod": { "type": "string" },
     "approvedParameters": {
       "type": "object",
       "required": ["storeyCount", "wallHeight", "slabThickness"],

@@ -6,77 +6,105 @@ description: Transforms 2D architectural DXF floor plans into semantically struc
 # DXF-to-3D-BIM
 
 ## Purpose
-Convert 2D architectural floor plan DXF files—either generated upstream by `Sketch-to-CAD` or supplied independently—into editable 3D Building Information Models (BIM) using BIMCraft. Generates genuine semantic BIM objects (Levels, Exterior/Interior Walls, Hosted Doors & Windows, Floor Slabs, Rooms, and Roofs), verifies geometric topology, and exports native `.bimcraft` and standard `IFC4` deliverables.
+Convert arbitrary 2D architectural floor plan DXF files—either generated upstream by `Sketch-to-CAD` or supplied independently—into editable 3D Building Information Models (BIM) using BIMCraft 0.9.0. Generates genuine semantic BIM objects (Levels, Exterior/Interior Walls, Hosted Doors & Windows, Floor Slabs, Rooms), verifies geometric topology, and exports native `.bimcraft` and standard `IFC4` deliverables with comprehensive run manifests.
 
 ## Activation Criteria
 Activate this skill when:
 - The user provides a 2D DXF architectural floor plan and requests a 3D BIM model, IFC export, or BIMCraft project.
 - The user completes a `Sketch-to-CAD` workflow and proceeds to 3D model generation.
 - The user asks to convert CAD floor plans to IFC, 3D architecture, or BIMCraft.
+- The user requests preflight inspection or validation of CAD floor plan geometry.
 
 ## Mandatory Principles
-1. **Semantic BIM, Not Extruded Linework**: Never convert raw CAD lines directly into arbitrary meshes or generic solids. Always reconstruct wall centerlines, thicknesses, and hosted relationships to generate genuine BIMCraft elements (`wall`, `door`, `window`, `floor`, `level`).
-2. **Mandatory Human Approval Gate**: 2D floor plans do not contain vertical elevation data (storey height, window sill height, door height, roof pitch). The agent MUST present an intermediate model proposal with explicit assumptions and obtain user approval before generating BIM elements.
-3. **Upstream Schema Alignment**: Seamlessly accept `floor-plan-model.json` from `Sketch-to-CAD` when available, while also supporting standalone third-party DXFs via configurable layer classification.
-4. **Independent Model Validation**: Verify generated `.bimcraft` and `IFC4` models by re-opening and checking element counts, storey associations, and geometry consistency before reporting completion.
-5. **Engineering & Structural Boundary**: All generated structural elements (beams, columns, slabs) are conceptual for spatial coordination. Never claim structural safety, code compliance, or licensed engineering certification.
+1. **Universal Preflight Audit**: Always audit drawings before construction. Inspect units ($INSUNITS), detect unit ambiguity, evaluate scale confidence, check modelspace vs. paperspace, and flag unclassified layers or unsupported entities.
+2. **Never Guess Ambiguous Units Silently**: If $INSUNITS is 0 or absent, flag the ambiguity, provide heuristic suggestions based on extents, and obtain user confirmation or configuration override.
+3. **Semantic BIM, Not Extruded Linework**: Never convert raw CAD lines directly into arbitrary meshes or generic solids. Always reconstruct wall centerlines, thicknesses, and hosted relationships to generate genuine BIMCraft elements (`wall`, `door`, `window`, `floor`, `level`). Collinear wall segments are automatically merged across opening gaps.
+4. **Mandatory Human Approval Gate**: 2D floor plans do not contain vertical elevation data (storey height, window sill height, door height, slab thickness). The agent MUST present an intermediate model proposal structured across 7 logical sections and obtain user approval before generating BIM elements.
+5. **Deterministic Approval Integrity**: Approvals are cryptographically locked using SHA-256 hashes of the model, DXF, and configuration. If inputs change after approval, the approval is invalidated.
+6. **Independent Model Validation**: Verify generated `.bimcraft` and `IFC4` models by re-opening and checking element counts, opening voiding/filling relationships (`IfcRelVoidsElement`, `IfcRelFillsElement`), storey containment (`IfcRelContainedInSpatialStructure`), and visual plan alignment.
+7. **Traceable Deliverables Package**: Organize outputs into `analysis/`, `models/`, `previews/`, `reports/`, and a top-level `manifest.json`.
+8. **Engineering & Structural Boundary**: All generated structural elements (beams, columns, slabs) are conceptual for spatial coordination. Never claim structural safety, code compliance, or licensed engineering certification.
 
 ## Inputs
 - **Required**:
   - Architectural DXF file (`.dxf`).
 - **Optional**:
   - Upstream structured floor plan JSON (`floor-plan-model.json`).
+  - Project configuration JSON (`--config path/to/config.json`).
+  - Explicit unit override (`--unit mm|m|ft|in`).
   - Source sketch or preview image (`.png` / `.jpg`).
-  - User-specified vertical heights (storey height, door/window heights).
+
+## CLI Workflow & Execution
+
+### Preflight Inspection
+```powershell
+dxf-to-3d-bim inspect path\to\plan.dxf --out-json preflight.json --out-md preflight.md
+```
+
+### Guided Interactive One-Command Run
+```powershell
+dxf-to-3d-bim run path\to\plan.dxf --out deliverables
+```
+
+### Headless Automated Run (Non-Interactive)
+```powershell
+dxf-to-3d-bim run path\to\plan.dxf --out deliverables --non-interactive --config approved-config.json
+```
 
 ## Workflow Stages
 
 ```mermaid
 flowchart LR
-    A["1. Inspect DXF"] --> B["2. Reconstruct Geometry"]
-    B --> C["3. Mandatory Approval Gate"]
-    C --> D["4. BIM Generation (BIMCraft)"]
-    D --> E["5. Validation & QA"]
-    E --> F["6. Deliver Deliverables"]
+    A["1. Preflight Analysis"] --> B["2. Reconstruct Geometry"]
+    B --> C["3. Guided Approval Gate"]
+    C --> D["4. BIM Construction (BIMCraft)"]
+    D --> E["5. Validation & Visual QA"]
+    E --> F["6. Deliverables & Manifest"]
 ```
 
-### Stage 1: Inspect DXF
-- Parse drawing units, header variables, layers, extents, and supported entity types.
-- Detect units; if missing or ambiguous, confirm with the user.
+### Stage 1: Preflight Analysis
+- Inspect DXF header, modelspace entities, layer classifications, and external references (XREFs).
+- Check scale confidence and flag unit ambiguity if $INSUNITS is missing or 0.
+- Generate `analysis/preflight_report.json` and `analysis/preflight_report.md`.
 - Refer to [`workflows/inspect-dxf.md`](file:///d:/Agent%20Skills/DXF%20to%203D-BIM/skills/dxf-to-3d-bim/workflows/inspect-dxf.md).
 
 ### Stage 2: Reconstruct Geometry
 - Classify layers using [`references/dxf-layer-mapping.md`](file:///d:/Agent%20Skills/DXF%20to%203D-BIM/skills/dxf-to-3d-bim/references/dxf-layer-mapping.md).
-- Reconstruct wall centerlines, measure thicknesses, snap L- and T-junctions, and host doors/windows onto host walls.
+- Reconstruct wall centerlines, bridge opening gaps along collinear lines, and host doors/windows within host wall bounds.
 - Produce intermediate model conforming to [`schemas/bim-model.schema.json`](file:///d:/Agent%20Skills/DXF%20to%203D-BIM/skills/dxf-to-3d-bim/schemas/bim-model.schema.json).
 - Refer to [`workflows/reconstruct-geometry.md`](file:///d:/Agent%20Skills/DXF%20to%203D-BIM/skills/dxf-to-3d-bim/workflows/reconstruct-geometry.md).
 
-### Stage 3: Mandatory User Approval Gate
-- Present the reconstructed footprint, wall counts, door/window counts, inferred storey heights, and uncertainty log to the user.
-- **DO NOT proceed to BIMCraft construction without explicit user approval.**
-- Record approval conforming to [`schemas/approval.schema.json`](file:///d:/Agent%20Skills/DXF%20to%203D-BIM/skills/dxf-to-3d-bim/schemas/approval.schema.json).
+### Stage 3: Guided Approval Gate
+- Present the 7 architectural sections: Units/Scale, Walls, Openings, Slab, Storeys, Warnings, and Deliverables.
+- In interactive mode: allow user to accept, edit parameters, or cancel.
+- In non-interactive mode: verify pre-approved configuration and DXF hash match without terminal pauses.
+- Record version-locked approval in `analysis/approval_record.json` conforming to [`schemas/approval.schema.json`](file:///d:/Agent%20Skills/DXF%20to%203D-BIM/skills/dxf-to-3d-bim/schemas/approval.schema.json).
 - Refer to [`workflows/approve-model.md`](file:///d:/Agent%20Skills/DXF%20to%203D-BIM/skills/dxf-to-3d-bim/workflows/approve-model.md).
 
-### Stage 4: BIM Generation (BIMCraft Backend)
-- Execute verified BIMCraft CLI commands or MCP tools.
-- Construct elements in strict order: Levels → Walls → Slabs → Hosted Doors/Windows → Rooms → Roofs.
-- Save native project (`.bimcraft`), export standard IFC4 (`.ifc`), and render plan preview (`.png`).
+### Stage 4: BIM Construction (BIMCraft Backend)
+- Execute verified BIMCraft CLI 0.9.0 commands (`wall`, `floor`, `door`, `window`, `elevation`, `section`, `render`).
+- Construct elements in strict order: Levels → Walls → Slabs → Hosted Doors/Windows → Rooms.
+- Save native project into `models/<project>.bimcraft` and export standard IFC4 into `models/<project>.ifc`.
+- Render plan preview into `previews/<project>.png`, 3D axonometric into `previews/<project>_3d.png`, and elevations/sections.
 - Refer to [`workflows/generate-bim.md`](file:///d:/Agent%20Skills/DXF%20to%203D-BIM/skills/dxf-to-3d-bim/workflows/generate-bim.md).
 
-### Stage 5: Validation & Quality Assurance
-- Independently inspect the generated `.bimcraft` and `.ifc` models using `bimcraft-cli info`.
-- Verify element counts, storey associations, non-zero file sizes, and visual plan alignment.
+### Stage 5: Validation & Visual QA
+- Independently inspect the generated `.bimcraft` and `.ifc` models using `bimcraft-cli info` and `PureIfcParser`.
+- Verify opening voiding (`IfcRelVoidsElement`), filling (`IfcRelFillsElement`), and storey containment.
+- Generate CAD-to-BIM visual comparison overlay `previews/<project>_comparison_overlay.png`.
 - Produce validation report conforming to [`schemas/validation-report.schema.json`](file:///d:/Agent%20Skills/DXF%20to%203D-BIM/skills/dxf-to-3d-bim/schemas/validation-report.schema.json).
 - Refer to [`workflows/validate-bim.md`](file:///d:/Agent%20Skills/DXF%20to%203D-BIM/skills/dxf-to-3d-bim/workflows/validate-bim.md).
 
-### Stage 6: Deliver Deliverables
-- Package `.bimcraft`, `.ifc`, `.png`, and validation report.
-- Deliver summary report with explicit verification status and professional review notices.
+### Stage 6: Deliverables & Manifest
+- Package all artifacts into `analysis/`, `models/`, `previews/`, and `reports/`.
+- Generate `manifest.json` recording toolchain versions, artifact SHA-256 hashes, file sizes, and run status.
+- Generate human review summary `reports/review_summary.md`.
 - Refer to [`workflows/export-deliverables.md`](file:///d:/Agent%20Skills/DXF%20to%203D-BIM/skills/dxf-to-3d-bim/workflows/export-deliverables.md).
 
 ## Error Recovery
-- **Missing Units**: Request user confirmation or reference dimension before geometry scaling.
-- **Unassociated Openings**: Log as unhosted openings in intermediate model; do not generate disconnected doors/windows.
-- **BIMCraft Execution Failure**: Halt immediately, preserve intermediate JSON and execution logs, and report actionable CLI output.
-- **Approval Rejection**: Update intermediate model based on user feedback and reset status to `awaiting_approval`.
-
+- **Missing / Ambiguous Units**: In interactive mode, prompt user for unit confirmation. In non-interactive mode, halt immediately with actionable message unless `--unit` or `units.source_unit` in `--config` is supplied.
+- **Empty Drawing or Annotations-Only**: Preflight detects lack of wall linework, marks preflight FAILED, and halts before geometry reconstruction.
+- **Corrupt DXF File**: Preflight catches parser/structure errors, writes failed manifest, and directs user to recover file in CAD.
+- **Overlapping Openings**: Automatically deduplicate overlapping openings on the same host wall to maintain physical BIM validity.
+- **BIMCraft Execution Failure**: Halt immediately, capture stderr/stdout, save failure record into `manifest.json`, and exit with code 1.
+- **Approval Rejection**: If user cancels approval, save status `REJECTED` into `manifest.json` and exit with code 2.

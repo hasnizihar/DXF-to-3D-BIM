@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BIMProjectConfiguration",
+  "description": "Schema for configuring DXF-to-3D-BIM parameters, tolerances, units, and vertical dimensions",
+  "type": "object",
+  "properties": {
+    "version": { "type": "string" },
+    "units": {
+      "type": "object",
+      "properties": {
+        "internal": { "type": "string", "enum": ["mm"] },
+        "source_unit": { "type": "string", "enum": ["mm", "cm", "m", "in", "ft"] },
+        "dxf_default_if_unspecified": { "type": "string", "enum": ["mm", "m", "ft", "in"] }
+      }
+    },
+    "levels": {
+      "type": "object",
+      "properties": {
+        "default_storeys": { "type": "integer", "minimum": 1 },
+        "ground_floor_elevation": { "type": "number" },
+        "floor_to_floor_height": { "type": "number", "minimum": 1000 },
+        "level_names": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "walls": {
+      "type": "object",
+      "properties": {
+        "exterior_thickness": { "type": "number", "minimum": 50 },
+        "interior_thickness": { "type": "number", "minimum": 50 },
+        "height": { "type": "number", "minimum": 1000 }
+      }
+    },
+    "openings": {
+      "type": "object",
+      "properties": {
+        "door_width": { "type": "number", "minimum": 300 },
+        "door_height": { "type": "number", "minimum": 1500 },
+        "window_width": { "type": "number", "minimum": 300 },
+        "window_height": { "type": "number", "minimum": 300 },
+        "window_sill_height": { "type": "number", "minimum": 0 }
+      }
+    },
+    "slab": {
+      "type": "object",
+      "properties": {
+        "thickness": { "type": "number", "minimum": 50 },
+        "elevation": { "type": "number" }
+      }
+    },
+    "tolerances": {
+      "type": "object",
+      "properties": {
+        "endpoint_snap": { "type": "number", "minimum": 0 },
+        "collinear_distance": { "type": "number", "minimum": 0 },
+        "collinear_angle_deg": { "type": "number", "minimum": 0 },
+        "min_wall_thickness": { "type": "number", "minimum": 10 },
+        "max_wall_thickness": { "type": "number", "minimum": 50 },
+        "min_wall_length": { "type": "number", "minimum": 50 },
+        "opening_snap_to_wall": { "type": "number", "minimum": 10 },
+        "duplicate_line_threshold": { "type": "number", "minimum": 0 },
+        "polygon_closure_threshold": { "type": "number", "minimum": 0 }
+      }
+    },
+    "ignored_layers": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

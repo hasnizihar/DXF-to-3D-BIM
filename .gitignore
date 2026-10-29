@@ -46,6 +46,7 @@ htmlcov/
 *.ifc
 *.autosave.bimcraft
 output/
+deliverables*/
 dist/
 tmp/
 *.log

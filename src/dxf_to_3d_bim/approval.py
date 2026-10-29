@@ -5,7 +5,7 @@ import hashlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, Optional
 import jsonschema
 
 from dxf_to_3d_bim.intermediate_model import IntermediateBimModel
@@ -93,31 +93,42 @@ class ApprovalGate:
         model: IntermediateBimModel,
         approved_by: str = "Authorized Reviewer",
         notes: str = "Approved for BIMCraft construction",
+        dxf_hash: Optional[str] = None,
+        config_hash: Optional[str] = None,
+        approval_method: str = "interactive",
     ) -> Dict[str, Any]:
         """Applies approval to the model and updates status."""
         model_hash = compute_model_hash(model.data)
         now_iso = datetime.now(timezone.utc).isoformat()
 
         model.data["status"] = "approved"
-        model.data["approval"] = {
+        approval_data: Dict[str, Any] = {
             "isApproved": True,
             "approvedBy": approved_by,
             "approvedAt": now_iso,
             "modelHash": model_hash,
             "notes": notes,
+            "approvalMethod": approval_method,
         }
+        if dxf_hash:
+            approval_data["dxfHash"] = dxf_hash
+        if config_hash:
+            approval_data["configHash"] = config_hash
+
+        model.data["approval"] = approval_data
         model.data["metadata"]["updatedAt"] = now_iso
 
         # Validate against approval.schema.json
         summary = ApprovalGate.generate_proposal_summary(model)
         vert = summary["proposed_vertical_parameters"]
 
-        approval_record = {
+        approval_record: Dict[str, Any] = {
             "projectName": model.data.get("metadata", {}).get("projectName", "Project"),
             "modelHash": model_hash,
             "status": "approved",
             "approvedBy": approved_by,
             "timestamp": now_iso,
+            "approvalMethod": approval_method,
             "approvedParameters": {
                 "storeyCount": vert["storeys"],
                 "wallHeight": vert["wall_height_mm"],
@@ -125,6 +136,10 @@ class ApprovalGate:
             },
             "notes": notes,
         }
+        if dxf_hash:
+            approval_record["dxfHash"] = dxf_hash
+        if config_hash:
+            approval_record["configHash"] = config_hash
 
         if APPROVAL_SCHEMA_PATH.exists():
             with open(APPROVAL_SCHEMA_PATH, "r", encoding="utf-8") as f:
@@ -134,7 +149,11 @@ class ApprovalGate:
         return approval_record
 
     @staticmethod
-    def verify_approval(model: IntermediateBimModel) -> Tuple[bool, str]:
+    def verify_approval(
+        model: IntermediateBimModel,
+        expected_dxf_hash: Optional[str] = None,
+        expected_config_hash: Optional[str] = None,
+    ) -> Tuple[bool, str]:
         """Verifies that the model has valid, untampered approval."""
         approval = model.data.get("approval", {})
         if not approval.get("isApproved", False):
@@ -151,6 +170,14 @@ class ApprovalGate:
 
         if model.data.get("status") != "approved":
             return False, f"Model status is '{model.data.get('status')}', must be 'approved'."
+
+        if expected_dxf_hash and approval.get("dxfHash"):
+            if approval["dxfHash"] != expected_dxf_hash:
+                return False, "Source DXF file has been modified since approval! Prior approval is invalidated."
+
+        if expected_config_hash and approval.get("configHash"):
+            if approval["configHash"] != expected_config_hash:
+                return False, "Configuration parameters have changed since approval! Prior approval is invalidated."
 
         return True, "Approval is valid."
 

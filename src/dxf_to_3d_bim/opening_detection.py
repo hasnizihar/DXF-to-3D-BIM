@@ -67,26 +67,35 @@ class OpeningDetector:
 
         for arc in door_arcs:
             width = arc.radius
-            # Center of the opening is offset from the hinge by radius / 2
+            eff_width = round(width, 2) if width > 200 else self.default_door_width
+            half_w = max(460.0, eff_width / 2.0)
+            req_len = 2.0 * half_w
+
             center_x = arc.center[0]
             center_y = arc.center[1]
 
-            host_wall, proj_pt, offset, dist = self._find_host_wall((center_x, center_y), walls)
+            host_wall, proj_pt, offset, dist = self._find_host_wall((center_x, center_y), walls, required_length=req_len)
             if host_wall and dist <= self.host_snap_tolerance:
+                # Clamp center to fit strictly inside wall segment
+                clamped_offset = max(half_w, min(host_wall.length - half_w, offset))
+                t = clamped_offset / host_wall.length if host_wall.length > 0 else 0.0
+                cx = host_wall.start[0] + t * (host_wall.end[0] - host_wall.start[0])
+                cy = host_wall.start[1] + t * (host_wall.end[1] - host_wall.start[1])
+
                 op = ReconstructedOpening(
                     id=f"door_{counter}",
                     type="door",
                     wall_id=host_wall.id,
-                    center=(round(proj_pt[0], 2), round(proj_pt[1], 2)),
-                    width=round(width, 2) if width > 200 else self.default_door_width,
+                    center=(round(cx, 2), round(cy, 2)),
+                    width=eff_width,
                     height=self.default_door_height,
-                    offset_along_wall=round(offset, 2),
+                    offset_along_wall=round(clamped_offset, 2),
                     swing="single",
                     confidence="high",
                     source_entities=[arc.id],
                 )
                 openings.append(op)
-                processed_door_locations.append(proj_pt)
+                processed_door_locations.append((cx, cy))
                 counter += 1
             else:
                 unhosted.append({"type": "door", "source": arc.id, "position": [center_x, center_y]})
@@ -95,26 +104,33 @@ class OpeningDetector:
         door_lines = [l for l in lines if classifier.classify(l.layer) == "door"]
         for line in door_lines:
             mid = ((line.start[0] + line.end[0]) / 2.0, (line.start[1] + line.end[1]) / 2.0)
-            # Avoid duplicate if near processed arc door
             if any(distance_point_to_point(mid, p) < 500 for p in processed_door_locations):
                 continue
 
-            host_wall, proj_pt, offset, dist = self._find_host_wall(mid, walls)
+            eff_width = line.length if line.length > 200 else self.default_door_width
+            half_w = max(460.0, eff_width / 2.0)
+            req_len = 2.0 * half_w
+
+            host_wall, proj_pt, offset, dist = self._find_host_wall(mid, walls, required_length=req_len)
             if host_wall and dist <= self.host_snap_tolerance:
-                width = line.length if line.length > 200 else self.default_door_width
+                clamped_offset = max(half_w, min(host_wall.length - half_w, offset))
+                t = clamped_offset / host_wall.length if host_wall.length > 0 else 0.0
+                cx = host_wall.start[0] + t * (host_wall.end[0] - host_wall.start[0])
+                cy = host_wall.start[1] + t * (host_wall.end[1] - host_wall.start[1])
+
                 op = ReconstructedOpening(
                     id=f"door_{counter}",
                     type="door",
                     wall_id=host_wall.id,
-                    center=(round(proj_pt[0], 2), round(proj_pt[1], 2)),
-                    width=round(width, 2),
+                    center=(round(cx, 2), round(cy, 2)),
+                    width=round(eff_width, 2),
                     height=self.default_door_height,
-                    offset_along_wall=round(offset, 2),
+                    offset_along_wall=round(clamped_offset, 2),
                     confidence="medium",
                     source_entities=[line.id],
                 )
                 openings.append(op)
-                processed_door_locations.append(proj_pt)
+                processed_door_locations.append((cx, cy))
                 counter += 1
 
         # 3. Process Windows
@@ -126,33 +142,77 @@ class OpeningDetector:
             if any(distance_point_to_point(mid, p) < 400 for p in processed_window_locations):
                 continue
 
-            host_wall, proj_pt, offset, dist = self._find_host_wall(mid, walls)
+            eff_width = line.length if line.length > 200 else self.default_window_width
+            half_w = max(610.0, eff_width / 2.0)
+            req_len = 2.0 * half_w
+
+            host_wall, proj_pt, offset, dist = self._find_host_wall(mid, walls, required_length=req_len)
             if host_wall and dist <= self.host_snap_tolerance:
-                width = line.length if line.length > 200 else self.default_window_width
+                clamped_offset = max(half_w, min(host_wall.length - half_w, offset))
+                t = clamped_offset / host_wall.length if host_wall.length > 0 else 0.0
+                cx = host_wall.start[0] + t * (host_wall.end[0] - host_wall.start[0])
+                cy = host_wall.start[1] + t * (host_wall.end[1] - host_wall.start[1])
+
                 op = ReconstructedOpening(
                     id=f"window_{counter}",
                     type="window",
                     wall_id=host_wall.id,
-                    center=(round(proj_pt[0], 2), round(proj_pt[1], 2)),
-                    width=round(width, 2),
+                    center=(round(cx, 2), round(cy, 2)),
+                    width=round(eff_width, 2),
                     height=self.default_window_height,
                     sill_height=self.default_window_sill_height,
-                    offset_along_wall=round(offset, 2),
+                    offset_along_wall=round(clamped_offset, 2),
                     confidence="high",
                     source_entities=[line.id],
                 )
                 openings.append(op)
-                processed_window_locations.append(proj_pt)
+                processed_window_locations.append((cx, cy))
                 counter += 1
             else:
                 unhosted.append({"type": "window", "source": line.id, "position": [mid[0], mid[1]]})
 
-        return openings, unhosted
+        # 4. Deduplicate overlapping openings on the same host wall
+        clean_openings = self._deduplicate_overlapping_openings(openings, walls)
+
+        return clean_openings, unhosted
+
+    def _deduplicate_overlapping_openings(
+        self,
+        openings: List[ReconstructedOpening],
+        walls: List[ReconstructedWall],
+    ) -> List[ReconstructedOpening]:
+        """Ensures openings hosted on the same wall do not collide or overlap in 3D BIM."""
+        by_wall: Dict[str, List[ReconstructedOpening]] = {}
+        for op in openings:
+            by_wall.setdefault(op.wall_id, []).append(op)
+
+        wall_dict = {w.id: w for w in walls}
+        deduped: List[ReconstructedOpening] = []
+
+        for wid, wall_ops in by_wall.items():
+            hw = wall_dict.get(wid)
+            if not hw:
+                continue
+            wall_ops.sort(key=lambda x: x.offset_along_wall)
+            kept: List[ReconstructedOpening] = []
+            for op in wall_ops:
+                min_half = 460.0 if op.type == "door" else 610.0
+                half_w = max(min_half, op.width / 2.0)
+                if kept:
+                    prev = kept[-1]
+                    prev_half = max(460.0 if prev.type == "door" else 610.0, prev.width / 2.0)
+                    if op.offset_along_wall - prev.offset_along_wall < (half_w + prev_half + 50.0):
+                        continue  # Overlaps with previous opening on same wall
+                kept.append(op)
+            deduped.extend(kept)
+
+        return deduped
 
     def _find_host_wall(
         self,
         pt: Tuple[float, float],
         walls: List[ReconstructedWall],
+        required_length: float = 0.0,
     ) -> Tuple[Optional[ReconstructedWall], Tuple[float, float], float, float]:
         best_wall = None
         best_proj = pt
@@ -160,6 +220,8 @@ class OpeningDetector:
         best_dist = float("inf")
 
         for w in walls:
+            if w.length < required_length:
+                continue
             proj, dist, offset = project_point_onto_segment(pt, w.start, w.end)
             if dist < best_dist:
                 best_dist = dist

@@ -128,6 +128,8 @@ class BimcraftAdapter:
         output_dir: str | Path,
         base_name: Optional[str] = None,
         generate_3d_views: bool = True,
+        models_dir: Optional[str | Path] = None,
+        previews_dir: Optional[str | Path] = None,
     ) -> BimcraftBuildResult:
         # Enforce approval gate
         valid_approval, reason = ApprovalGate.verify_approval(model)
@@ -140,20 +142,26 @@ class BimcraftAdapter:
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
+        m_dir = Path(models_dir) if models_dir else output_dir
+        m_dir.mkdir(parents=True, exist_ok=True)
+
+        p_dir = Path(previews_dir) if previews_dir else output_dir
+        p_dir.mkdir(parents=True, exist_ok=True)
+
         if not base_name:
             base_name = model.data.get("metadata", {}).get("projectName", "bim_model")
             base_name = base_name.replace(" ", "_").lower()
 
-        bimcraft_file = output_dir / f"{base_name}.bimcraft"
-        ifc_file = output_dir / f"{base_name}.ifc"
-        png_file = output_dir / f"{base_name}.png"
+        bimcraft_file = m_dir / f"{base_name}.bimcraft"
+        ifc_file = m_dir / f"{base_name}.ifc"
+        png_file = p_dir / f"{base_name}.png"
 
         views_config: Dict[str, Path] = {}
         if generate_3d_views:
-            views_config["view_3d"] = output_dir / f"{base_name}_3d.png"
-            views_config["elevation_south"] = output_dir / f"{base_name}_elev_south.png"
-            views_config["elevation_east"] = output_dir / f"{base_name}_elev_east.png"
-            views_config["section"] = output_dir / f"{base_name}_section_a.png"
+            views_config["view_3d"] = p_dir / f"{base_name}_3d.png"
+            views_config["elevation_south"] = p_dir / f"{base_name}_elev_south.png"
+            views_config["elevation_east"] = p_dir / f"{base_name}_elev_east.png"
+            views_config["section"] = p_dir / f"{base_name}_section_a.png"
 
         commands = self.build_commands(model, views_config=views_config if generate_3d_views else None)
 

@@ -7,49 +7,95 @@ from typing import Optional
 
 import typer
 from rich.console import Console
+from rich.panel import Panel
 from rich.table import Table
 
 from dxf_to_3d_bim.approval import ApprovalGate
 from dxf_to_3d_bim.bimcraft_adapter import BimcraftAdapter, BimcraftBuildResult
 from dxf_to_3d_bim.comparison import SourceToBimComparator
+from dxf_to_3d_bim.config import ConfigManager, ProjectConfig
 from dxf_to_3d_bim.dxf_parser import DxfParser
+from dxf_to_3d_bim.guided_approval import GuidedApprovalSession
 from dxf_to_3d_bim.intermediate_model import IntermediateBimModel
 from dxf_to_3d_bim.layer_classifier import LayerClassifier
+from dxf_to_3d_bim.manifest import RunManifest, file_sha256
 from dxf_to_3d_bim.opening_detection import OpeningDetector
-from dxf_to_3d_bim.reporting import ReviewSummaryGenerator
+from dxf_to_3d_bim.preflight import PreflightAnalyzer, PreflightStatus, ScaleConfidence
+from dxf_to_3d_bim.reporting import ReviewSummaryGenerator, compute_file_sha256
 from dxf_to_3d_bim.room_detection import SpatialDetector
 from dxf_to_3d_bim.validator import ModelValidator
 from dxf_to_3d_bim.wall_reconstruction import WallReconstructor
 
 app = typer.Typer(help="DXF-to-3D-BIM: Autonomous conversion of 2D DXF floor plans into 3D BIM models.")
-console = Console()
+console = Console(legacy_windows=False)
 
 
 @app.command()
-def inspect(dxf_path: str):
-    """Inspects a 2D DXF file and displays units, bounding box, and layer tallies."""
-    parser = DxfParser()
-    try:
-        report = parser.inspect_file(dxf_path)
-    except Exception as e:
-        console.print(f"[bold red]Error inspecting file:[/bold red] {e}")
-        raise typer.Exit(1)
+def inspect(
+    dxf_path: str = typer.Argument(..., help="Path to DXF drawing file to inspect"),
+    out_json: Optional[str] = typer.Option(None, "--out-json", "-j", help="Path to save machine-readable preflight JSON"),
+    out_md: Optional[str] = typer.Option(None, "--out-md", "-m", help="Path to save readable Markdown preflight report"),
+    unit: Optional[str] = typer.Option(None, "--unit", "-u", help="Explicit unit override (mm, m, ft, in)"),
+):
+    """Executes universal preflight analysis on a DXF file before BIM generation."""
+    analyzer = PreflightAnalyzer()
+    report = analyzer.analyze(dxf_path, unit_override=unit)
 
-    table = Table(title=f"DXF Inspection: {Path(dxf_path).name}")
+    # 1. Display Header & Status
+    status_color = "green" if report.overall_status == PreflightStatus.PASSED else (
+        "yellow" if report.overall_status == PreflightStatus.WARNING else "red"
+    )
+    console.print(f"\n[bold {status_color}]Preflight Status: {report.overall_status.value}[/bold {status_color}]")
+
+    # 2. Key Properties Table
+    table = Table(title=f"DXF Preflight Summary: {report.file_name}")
     table.add_column("Property", style="cyan")
     table.add_column("Value", style="green")
 
     table.add_row("DXF Version", report.dxf_version)
     table.add_row("Detected Units", f"{report.detected_units} (INSUNITS={report.insunits_code})")
-    table.add_row("Scale to mm", str(report.scale_factor_to_mm))
-    table.add_row("Extents (mm)", f"{report.bounding_box['width']} x {report.bounding_box['depth']}")
-    table.add_row("Total Entities", str(report.total_entities))
-    table.add_row("Layers Found", ", ".join(report.layers))
-
+    table.add_row("Scale Confidence", report.scale_confidence.value)
+    table.add_row("Scale Factor to mm", f"{report.scale_factor_to_mm}x")
+    table.add_row("Raw Extents", f"{report.raw_extents.get('width', 0):.2f} x {report.raw_extents.get('depth', 0):.2f}")
+    table.add_row("Projected Footprint (mm)", f"{report.extents_mm.get('width', 0):.1f} x {report.extents_mm.get('depth', 0):.1f}")
+    table.add_row("Modelspace Entities", str(report.total_modelspace_entities))
+    table.add_row("Paperspace Entities (Ignored)", str(report.total_paperspace_entities))
+    table.add_row("Candidate Walls", str(report.candidate_counts.get("walls", 0)))
+    table.add_row("Candidate Openings", f"{report.candidate_counts.get('doors', 0)} doors, {report.candidate_counts.get('windows', 0)} windows")
     console.print(table)
+
+    # 3. Layer Classification Table
+    layer_table = Table(title="Layer Semantic Classifications")
+    layer_table.add_column("Layer Name", style="cyan")
+    layer_table.add_column("Classification", style="white")
+    for lname, cat in sorted(report.layer_classifications.items()):
+        c_style = "green" if cat != "unknown" else "yellow"
+        layer_table.add_row(lname, f"[{c_style}]{cat}[/{c_style}]")
+    console.print(layer_table)
+
+    # 4. Warnings and Errors
     if report.warnings:
         for w in report.warnings:
-            console.print(f"[yellow]Warning: {w}[/yellow]")
+            console.print(f"[yellow][!] Warning: {w}[/yellow]")
+    if report.errors:
+        for err in report.errors:
+            console.print(f"[bold red][X] Error: {err}[/bold red]")
+
+    # 5. Output files if requested
+    if out_json:
+        p_json = Path(out_json)
+        p_json.parent.mkdir(parents=True, exist_ok=True)
+        p_json.write_text(report.to_json(), encoding="utf-8")
+        console.print(f"[green]Machine-readable JSON preflight report written to: {out_json}[/green]")
+
+    if out_md:
+        p_md = Path(out_md)
+        p_md.parent.mkdir(parents=True, exist_ok=True)
+        p_md.write_text(report.to_markdown(), encoding="utf-8")
+        console.print(f"[green]Markdown preflight report written to: {out_md}[/green]")
+
+    if report.overall_status == PreflightStatus.FAILED:
+        raise typer.Exit(1)
 
 
 @app.command()
@@ -209,28 +255,274 @@ def compare(
 
 @app.command()
 def run(
-    dxf_path: str,
-    out_dir: str = typer.Option("output", "--out", "-o", help="Deliverables output directory"),
-    auto_approve: bool = typer.Option(False, "--auto-approve", help="Simulate human approval for automated testing"),
+    dxf_path: str = typer.Argument(..., help="Path to input architectural DXF floor plan"),
+    out_dir: str = typer.Option("output", "--out", "-o", help="Structured deliverables output directory"),
+    config: Optional[str] = typer.Option(None, "--config", "-c", help="Path to project configuration JSON"),
+    unit: Optional[str] = typer.Option(None, "--unit", "-u", help="Explicit unit override (mm, m, ft, in)"),
+    non_interactive: bool = typer.Option(False, "--non-interactive", help="Run without terminal prompts (requires config or auto-approve)"),
+    auto_approve: bool = typer.Option(False, "--auto-approve", help="Simulate human approval for automated headless testing"),
+    views: bool = typer.Option(True, "--views/--no-views", help="Generate 3D isometric, elevation, and section views"),
+    force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing output directory files without warning"),
 ):
-    """Runs complete end-to-end pipeline from DXF to validated BIMCraft project, IFC, & 3D renders."""
-    console.print(f"[bold cyan]=== Starting DXF-to-3D-BIM Pipeline ===[/bold cyan]")
-    model_file = Path(out_dir) / "intermediate-model.json"
+    """Runs complete guided end-to-end pipeline from arbitrary DXF to validated BIMCraft project, IFC, & 3D renders."""
+    console.print(f"\n[bold cyan]=== DXF-to-3D-BIM Universal Pipeline ===[/bold cyan]")
+    input_path = Path(dxf_path)
+    if not input_path.exists() or not input_path.is_file():
+        console.print(f"[bold red]Input file error:[/bold red] File not found: {dxf_path}")
+        raise typer.Exit(1)
 
-    # 1. Prepare
-    prepare(dxf_path=dxf_path, json_path=None, output_path=str(model_file))
+    out_base = Path(out_dir).resolve()
 
-    # 2. Approval
-    if auto_approve:
-        console.print("[yellow]Auto-approving model for automated pipeline execution...[/yellow]")
-        approve(model_path=str(model_file), approved_by="Automated Test Runner", notes="Auto-approved test run")
+    # Create structured subdirectories
+    analysis_dir = out_base / "analysis"
+    models_dir = out_base / "models"
+    previews_dir = out_base / "previews"
+    reports_dir = out_base / "reports"
+
+    for d in [analysis_dir, models_dir, previews_dir, reports_dir]:
+        d.mkdir(parents=True, exist_ok=True)
+
+    manifest = RunManifest(
+        project_name=input_path.stem,
+        source_dxf={
+            "path": str(input_path.resolve()),
+            "sha256": compute_file_sha256(input_path),
+            "size_bytes": input_path.stat().st_size,
+        },
+        toolchain={
+            "python": sys.version.split()[0],
+            "bimcraft_cli": "0.9.0",
+            "platform": sys.platform,
+        },
+    )
+
+    # 1. Preflight Analysis Stage
+    console.print("[cyan]Running Preflight Analysis...[/cyan]")
+    analyzer = PreflightAnalyzer()
+    preflight = analyzer.analyze(input_path, unit_override=unit)
+
+    # Save preflight outputs
+    preflight_json = analysis_dir / "preflight_report.json"
+    preflight_md = analysis_dir / "preflight_report.md"
+    preflight_json.write_text(preflight.to_json(), encoding="utf-8")
+    preflight_md.write_text(preflight.to_markdown(), encoding="utf-8")
+    manifest.add_artifact("analysis", "preflight_json", preflight_json, base_dir=out_base)
+    manifest.add_artifact("analysis", "preflight_md", preflight_md, base_dir=out_base)
+
+    if preflight.overall_status == PreflightStatus.FAILED:
+        console.print(f"[bold red]Preflight Analysis FAILED:[/bold red]")
+        for err in preflight.errors:
+            console.print(f"  [bold red][X] {err}[/bold red]")
+        manifest.run_status = "FAILED"
+        manifest.errors = preflight.errors
+        manifest.save(out_base / "manifest.json")
+        raise typer.Exit(1)
+
+    if preflight.warnings:
+        console.print("[yellow]Preflight Warnings Detected:[/yellow]")
+        for w in preflight.warnings:
+            console.print(f"  [yellow][!] {w}[/yellow]")
+        manifest.warnings.extend(preflight.warnings)
+
+    # 2. Configuration Stage
+    if config:
+        console.print(f"[cyan]Loading configuration overrides from:[/cyan] {config}")
+        try:
+            cfg = ConfigManager.load_user_config(config)
+        except Exception as e:
+            console.print(f"[bold red]Configuration error:[/bold red] {e}")
+            manifest.run_status = "FAILED"
+            manifest.errors.append(str(e))
+            manifest.save(out_base / "manifest.json")
+            raise typer.Exit(1)
     else:
-        console.print("[bold red]Approval required! Run 'approve' on the model before build.[/bold red]")
-        raise typer.Exit(0)
+        cfg = ConfigManager.load_defaults()
 
-    # 3. Build & Validate
-    build(model_path=str(model_file), out_dir=out_dir, views=True)
-    console.print(f"[bold green]=== Pipeline Complete! ===[/bold green]")
+    if unit:
+        cfg.units.source_unit = unit
+
+    # 3. Geometric Reconstruction Stage
+    console.print("[cyan]Reconstructing Architectural Geometry...[/cyan]")
+    active_unit = cfg.units.source_unit or preflight.detected_units
+    parser = DxfParser(fallback_units=active_unit)
+    parsed = parser.parse(input_path, unit_override=active_unit)
+
+    classifier = LayerClassifier()
+    wall_rec = WallReconstructor()
+    walls = wall_rec.reconstruct(parsed.lines, classifier=classifier)
+
+    detector = OpeningDetector()
+    openings, unhosted = detector.detect_openings(parsed.lines, parsed.arcs, walls, classifier=classifier)
+
+    spatial = SpatialDetector()
+    slab_lines = [l for l in parsed.lines if classifier.is_slab_layer(l.layer)]
+    slab = spatial.detect_slab(walls, slab_lines=slab_lines)
+    floors = [slab] if slab else []
+    rooms = spatial.detect_rooms(parsed.texts, slab=slab, classifier=classifier)
+
+    assumptions = []
+    for u in unhosted:
+        assumptions.append({
+            "id": f"unhosted_{u['type']}_{u['source']}",
+            "target": u["type"],
+            "description": f"Unhosted {u['type']} detected near position {u['position']}",
+            "assumedValue": None,
+            "status": "unresolved",
+        })
+
+    model = IntermediateBimModel.create(
+        project_name=input_path.stem,
+        source_dxf_path=str(input_path.resolve()),
+        source_units=active_unit,
+        scale_factor=preflight.scale_factor_to_mm,
+        walls=walls,
+        openings=openings,
+        floors=floors,
+        rooms=rooms,
+        assumptions=assumptions,
+    )
+    inter_model_path = analysis_dir / "intermediate-model.json"
+    model.save(inter_model_path)
+    manifest.add_artifact("analysis", "intermediate_model", inter_model_path, base_dir=out_base)
+
+    # 4. Guided Approval Stage
+    approval_session = GuidedApprovalSession(
+        model=model,
+        preflight=preflight,
+        dxf_path=input_path,
+        config=cfg,
+        console=console,
+    )
+
+    try:
+        approval_record = approval_session.run_guided_session(
+            interactive=not non_interactive and not auto_approve,
+            auto_approve=auto_approve,
+            approved_by="CLI User" if not auto_approve else "Automated Runner",
+            notes="Approved via DXF-to-3D-BIM guided workflow",
+        )
+    except PermissionError as pe:
+        console.print(f"[bold red]Approval Gate:[/bold red] {pe}")
+        manifest.run_status = "REJECTED"
+        manifest.errors.append(str(pe))
+        manifest.save(out_base / "manifest.json")
+        raise typer.Exit(2)
+    except ValueError as ve:
+        console.print(f"[bold red]Configuration/Unit Requirement Error:[/bold red] {ve}")
+        manifest.run_status = "FAILED"
+        manifest.errors.append(str(ve))
+        manifest.save(out_base / "manifest.json")
+        raise typer.Exit(1)
+
+    approval_record_file = analysis_dir / "approval_record.json"
+    with open(approval_record_file, "w", encoding="utf-8") as f:
+        json.dump(approval_record, f, indent=2)
+    manifest.add_artifact("analysis", "approval_record", approval_record_file, base_dir=out_base)
+    manifest.approved_parameters = approval_record.get("approvedParameters", {})
+
+    # Re-save approved model state with updated hash and refresh manifest artifact
+    model.save(inter_model_path)
+    manifest.add_artifact("analysis", "intermediate_model", inter_model_path, base_dir=out_base)
+
+    # 5. BIMCraft Semantic Construction & Renders
+    console.print("\n[cyan]Executing BIMCraft 0.9.0 semantic construction and rendering...[/cyan]")
+    adapter = BimcraftAdapter()
+    build_res = adapter.execute_build(
+        model=model,
+        output_dir=out_base,
+        base_name=input_path.stem,
+        generate_3d_views=views,
+        models_dir=models_dir,
+        previews_dir=previews_dir,
+    )
+
+    if not build_res.success:
+        console.print(f"[bold red]BIMCraft execution failed:[/bold red] {build_res.error_message}")
+        manifest.run_status = "FAILED"
+        manifest.errors.append(build_res.error_message or "BIMCraft failed")
+        manifest.save(out_base / "manifest.json")
+        raise typer.Exit(1)
+
+    if build_res.bimcraft_path:
+        manifest.add_artifact("models", "bimcraft", build_res.bimcraft_path, base_dir=out_base)
+    if build_res.ifc_path:
+        manifest.add_artifact("models", "ifc4", build_res.ifc_path, base_dir=out_base)
+    if build_res.png_path:
+        manifest.add_artifact("previews", "plan_preview", build_res.png_path, base_dir=out_base)
+    if build_res.view_3d_path:
+        manifest.add_artifact("previews", "view_3d", build_res.view_3d_path, base_dir=out_base)
+    if build_res.elevation_south_path:
+        manifest.add_artifact("previews", "elevation_south", build_res.elevation_south_path, base_dir=out_base)
+    if build_res.elevation_east_path:
+        manifest.add_artifact("previews", "elevation_east", build_res.elevation_east_path, base_dir=out_base)
+    if build_res.section_path:
+        manifest.add_artifact("previews", "section_a", build_res.section_path, base_dir=out_base)
+
+    # 6. Deep Validation Stage
+    console.print("[cyan]Performing Independent IFC & Topological Validation...[/cyan]")
+    validator = ModelValidator(adapter)
+    val_report = validator.validate(model, build_res)
+    val_file = reports_dir / "validation-report.json"
+    with open(val_file, "w", encoding="utf-8") as f:
+        json.dump(val_report, f, indent=2)
+    manifest.add_artifact("reports", "validation_report", val_file, base_dir=out_base)
+
+    passed_checks = len([c for c in val_report.get("checks", []) if c.get("status") == "PASSED"])
+    failed_checks = len([c for c in val_report.get("checks", []) if c.get("status") == "FAILED"])
+    warning_checks = len([c for c in val_report.get("checks", []) if c.get("status") == "WARNING"])
+
+    manifest.validation_summary = {
+        "status": val_report.get("overallStatus", "UNKNOWN"),
+        "total_checks": len(val_report.get("checks", [])),
+        "passed": passed_checks,
+        "failed": failed_checks,
+        "warnings": warning_checks,
+    }
+    manifest.element_summary = val_report.get("elementSummary", {}).get("generated", {})
+
+    # 7. Geometric Comparison & Overlay Stage
+    comp_report = None
+    if input_path.exists():
+        console.print("[cyan]Generating Source DXF vs. BIM Geometric Overlay...[/cyan]")
+        overlay_file = previews_dir / f"{input_path.stem}_comparison_overlay.png"
+        comparator = SourceToBimComparator()
+        comp_report = comparator.compare(str(input_path), model, output_image_path=overlay_file)
+        manifest.add_artifact("previews", "comparison_overlay", overlay_file, base_dir=out_base)
+
+    # 8. Human Review Summary Stage
+    summary_md = ReviewSummaryGenerator.generate_markdown(model, val_report, comp_report, build_res)
+    review_file = reports_dir / "review_summary.md"
+    review_file.write_text(summary_md, encoding="utf-8")
+    manifest.add_artifact("reports", "review_summary", review_file, base_dir=out_base)
+
+    # 9. Save Manifest
+    manifest.run_status = "SUCCESS" if val_report.get("overallStatus") == "PASSED" else "WARNING"
+    manifest.save(out_base / "manifest.json")
+
+    # 10. Display Completion Summary
+    console.print("\n[bold green]====================================================================[/bold green]")
+    console.print("[bold green]       DXF-to-3D-BIM Pipeline Run Successfully Completed!           [/bold green]")
+    console.print("[bold green]====================================================================[/bold green]\n")
+
+    summary_table = Table(title=f"Generated Deliverables Package: {out_base.name}")
+    summary_table.add_column("Category", style="cyan")
+    summary_table.add_column("Artifact", style="white")
+    summary_table.add_column("Relative Path", style="green")
+
+    summary_table.add_row("Manifest", "Run Manifest JSON", "manifest.json")
+    summary_table.add_row("Models", "Native BIMCraft Project", f"models/{build_res.bimcraft_path.name}")
+    summary_table.add_row("Models", "Standard IFC4 Export", f"models/{build_res.ifc_path.name}")
+    summary_table.add_row("Previews", "2D Plan Preview", f"previews/{build_res.png_path.name}")
+    if build_res.view_3d_path:
+        summary_table.add_row("Previews", "3D Axonometric Render", f"previews/{build_res.view_3d_path.name}")
+    if comp_report and comp_report.overlay_image_path:
+        summary_table.add_row("Previews", "CAD/BIM Comparison Overlay", f"previews/{overlay_file.name}")
+    summary_table.add_row("Reports", "Independent Validation Report", "reports/validation-report.json")
+    summary_table.add_row("Reports", "Human Review Summary Markdown", "reports/review_summary.md")
+    console.print(summary_table)
+
+    console.print(f"[bold]Validation Status:[/bold] [{('green' if manifest.run_status == 'SUCCESS' else 'yellow')}]{manifest.run_status}[/]")
+    console.print(f"[bold]Output Root:[/bold] [cyan]{out_base}[/cyan]\n")
 
 
 def main():
