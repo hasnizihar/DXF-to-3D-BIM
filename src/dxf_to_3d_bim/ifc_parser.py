@@ -139,9 +139,10 @@ class IfcSemanticInspection:
     walls: List[Dict[str, Any]]
     openings: Dict[str, List[Dict[str, Any]]]
     slabs: List[Dict[str, Any]]
-    voids_verified: bool
-    fills_verified: bool
-    containment_verified: bool
+    roofs: List[Dict[str, Any]] = field(default_factory=list)
+    voids_verified: bool = False
+    fills_verified: bool = False
+    containment_verified: bool = False
     contained_by_storey: Dict[str, List[int]] = field(default_factory=dict)
     details: List[str] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
@@ -214,6 +215,7 @@ class PureIfcParser:
         door_entities = self.get_entities_by_type("IFCDOOR")
         window_entities = self.get_entities_by_type("IFCWINDOW")
         slab_entities = self.get_entities_by_type("IFCSLAB")
+        roof_entities = self.get_entities_by_type("IFCROOF")
         opening_entities = self.get_entities_by_type("IFCOPENINGELEMENT")
         storey_entities = self.get_entities_by_type("IFCBUILDINGSTOREY")
 
@@ -222,6 +224,7 @@ class PureIfcParser:
             "door": len(door_entities),
             "window": len(window_entities),
             "slab": len(slab_entities),
+            "roof": len(roof_entities),
             "opening_element": len(opening_entities),
             "storey": len(storey_entities),
         }
@@ -256,7 +259,7 @@ class PureIfcParser:
                 if structure_id:
                     contained_by_storey[structure_id] = elem_ids
 
-        all_primary_ids = {e.id for e in (wall_entities + door_entities + window_entities + slab_entities)}
+        all_primary_ids = {e.id for e in (wall_entities + door_entities + window_entities + slab_entities + roof_entities)}
         containment_verified = all_primary_ids.issubset(contained_element_ids) if all_primary_ids else True
         if containment_verified and all_primary_ids:
             details.append(f"Spatial containment verified: All {len(all_primary_ids)} primary building elements are linked to building storeys.")
@@ -355,6 +358,26 @@ class PureIfcParser:
                 "void_count": len(wall_to_openings.get(w.id, [])),
             })
 
+        # 7. Extract Roof Details
+        roofs = []
+        for rf in roof_entities:
+            # IFCROOF: (GlobalId, OwnerHistory, Name, Description, ObjectType, ObjectPlacement, Representation, Tag, PredefinedType)
+            raw_predef = rf.args[8] if len(rf.args) > 8 else None
+            predef_str = str(raw_predef).strip(".").upper() if raw_predef else "NOTDEFINED"
+            has_rep = bool(rf.args[6]) if len(rf.args) > 6 else False
+            host_st = None
+            for st_name, elem_list in contained_by_storey_named.items():
+                if rf.id in elem_list:
+                    host_st = st_name
+                    break
+            roofs.append({
+                "id": rf.id,
+                "name": rf.args[2] if len(rf.args) > 2 and isinstance(rf.args[2], str) else "Roof",
+                "predefined_type": predef_str,
+                "has_representation": has_rep,
+                "contained_in_storey": host_st,
+            })
+
         return IfcSemanticInspection(
             file_path=str(self.ifc_path),
             schema=self.schema,
@@ -363,6 +386,7 @@ class PureIfcParser:
             walls=walls,
             openings={"doors": doors, "windows": windows},
             slabs=[{"id": s.id} for s in slab_entities],
+            roofs=roofs,
             voids_verified=voids_verified,
             fills_verified=fills_verified,
             containment_verified=containment_verified,

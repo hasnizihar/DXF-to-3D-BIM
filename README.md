@@ -3,7 +3,7 @@
 [![Antigravity Skill](https://img.shields.io/badge/Antigravity-Skill-blue.svg)](https://github.com/google/antigravity)
 [![BIM Engine](https://img.shields.io/badge/BIMCraft-0.9.0-green.svg)](https://github.com/IPedrax/BIMCraft)
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-yellow.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/Tests-74%20Passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-82%20Passed-brightgreen.svg)]()
 
 An autonomous AI agent skill that transforms 2D architectural DXF floor plans into semantically structured, editable 3D Building Information Models using BIMCraft 0.9.0.
 
@@ -13,12 +13,13 @@ An autonomous AI agent skill that transforms 2D architectural DXF floor plans in
 
 - **Universal Preflight Analyzer**: Audits arbitrary CAD files for version, units, modelspace vs paperspace, scale confidence, XREFs, degenerate lines, and AIA layer classifications before BIM construction.
 - **Configurable Multi-Storey Reconstruction**: Reconstructs multi-storey buildings ($N \ge 1$) via Mode A (explicit DXF layers `L1-`, `L2-`, `STOREY_2_`, `FL01-`) or Mode B (user-configured storeys, custom storey heights, ground elevation, and repeated floor options).
-- **Guided Human Approval Gate**: Clear 7-section architectural review (Units/Scale, Walls, Openings, Slab, Storeys, Warnings, Deliverables). Locks approved parameters with deterministic SHA-256 snapshots.
+- **Parametric Roof Generation**: Generates 3D **Gable**, **Hip**, **Flat**, and **Shed** roofs with configurable pitch, eave overhang, thickness, and elevation. Automatically detects short-edge gable ends on rotated or axis-aligned buildings, hosts roofs atop the top occupied storey, and isolates non-occupied roof datums.
+- **Guided Human Approval Gate**: Clear architectural review (Units/Scale, Walls, Openings, Slab, Storeys & Roof, Warnings, Deliverables). Locks approved parameters with deterministic SHA-256 snapshots.
 - **One-Command End-to-End Execution**: Full CLI pipeline (`dxf-to-3d-bim run`) supporting interactive terminal guidance and headless automated CI/CD execution (`--non-interactive`).
-- **Semantic Reconstruction**: Reconstructs genuine architectural elements (Levels, Exterior/Interior Walls, Hosted Doors & Windows, Floor Slabs, Rooms) rather than CAD line extrusions. Collinear walls are automatically merged across opening gaps.
-- **BIMCraft CLI 0.9.0 Integration**: Headless construction producing native `.bimcraft` projects and standard `IFC4` models.
+- **Semantic Reconstruction**: Reconstructs genuine architectural elements (Levels, Exterior/Interior Walls, Hosted Doors & Windows, Floor Slabs, Roofs, Rooms) rather than CAD line extrusions. Collinear walls are automatically merged across opening gaps.
+- **BIMCraft CLI 0.9.0 Integration**: Headless construction producing native `.bimcraft` projects and standard `IFC4` models (`IFCROOF`, `IFCWALL`, `IFCDOOR`, etc.).
 - **Visual Verification Suite**: Generates 3D axonometric views, orthographic elevations (South, East), building cross-sections (Section A-A), per-level floor plans, and CAD-to-BIM comparison overlays with explicit deviation metrics.
-- **Independent STEP IFC Parser & Validator**: Pure-Python ISO-10303-21 parser verifying `IfcRelVoidsElement`, `IfcRelFillsElement`, `IfcRelContainedInSpatialStructure`, opening host alignment, and boundary containment.
+- **Independent STEP IFC Parser & Validator**: Pure-Python ISO-10303-21 parser verifying `IFCROOF` predefined types, `IfcRelVoidsElement`, `IfcRelFillsElement`, `IfcRelContainedInSpatialStructure`, opening host alignment, and boundary containment.
 - **Structured Deliverables Package & Manifest**: Packages outputs into `analysis/`, `models/`, `previews/`, `reports/`, and a top-level `manifest.json`.
 
 ---
@@ -133,7 +134,7 @@ Configuration overrides can be provided via `--config path/to/config.json`, conf
 
 ## Testing & Quality Assurance
 
-Run the automated test suite (66 tests):
+Run the automated test suite (82 tests):
 ```powershell
 .venv\Scripts\pytest.exe -v
 ```
@@ -141,6 +142,8 @@ Run the automated test suite (66 tests):
 ### Test Coverage Highlights
 - **Preflight (11 tests)**: Missing files, empty drawings, corrupt DXFs, annotations-only, ambiguous units, non-mm units, unknown layers, degenerate geometry.
 - **Guided Approval (7 tests)**: Interactive accept/edit/reject, DXF tamper detection, config tamper detection, stale approval detection.
+- **Multi-Storey Reconstruction (8 tests)**: Mode A layers, repeated ground floor, unequal heights, rotated stacking, parameter validation, IFC storey containment.
+- **Parametric Roof Generation (8 tests)**: Gable & hip calculations, rotated buildings, flat/shed types, parameter rejections, approval tamper detection, BIMCraft CLI generation, and IFC4 validation.
 - **Pipeline Workflow (8 tests)**: One-command run, structured directory generation, manifest hash verification, non-interactive validation.
 - **Geometric & IFC Robustness (40 tests)**: Collinear wall merging, opening voiding/filling relationships, spatial containment, ISO-10303-21 STEP tokenizer.
 

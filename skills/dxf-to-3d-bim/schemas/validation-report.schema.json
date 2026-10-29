@@ -32,7 +32,8 @@
             "walls": { "type": "integer" },
             "doors": { "type": "integer" },
             "windows": { "type": "integer" },
-            "levels": { "type": "integer" }
+            "levels": { "type": "integer" },
+            "roofs": { "type": "integer" }
           }
         },
         "generated": {
@@ -41,7 +42,8 @@
             "walls": { "type": "integer" },
             "doors": { "type": "integer" },
             "windows": { "type": "integer" },
-            "levels": { "type": "integer" }
+            "levels": { "type": "integer" },
+            "roofs": { "type": "integer" }
           }
         }
       }

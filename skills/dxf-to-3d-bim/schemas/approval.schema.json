@@ -24,7 +24,12 @@
         "interiorWallThickness": { "type": "number" },
         "doorHeight": { "type": "number" },
         "windowHeight": { "type": "number" },
-        "windowSillHeight": { "type": "number" }
+        "windowSillHeight": { "type": "number" },
+        "roofType": { "type": "string" },
+        "roofPitch": { "type": "number" },
+        "roofOverhang": { "type": "number" },
+        "roofThickness": { "type": "number" },
+        "roofBaseElevation": { "type": "number" }
       }
     },
     "notes": { "type": "string" }

@@ -116,7 +116,40 @@ class BimcraftAdapter:
                     win_params["sill"] = float(op["sillHeight"])
                 cmds.append(("window", win_params))
 
-        # 5. Visual Views & Renderings (if configured)
+        # 5. Roofs
+        for rf in d.get("roofs", []):
+            roof_type = rf.get("roofType", "none")
+            if roof_type in ("none", None):
+                continue
+            roof_params: Dict[str, Any] = {
+                "boundary": rf["boundary"],
+                "level": rf.get("levelId", "Level 1"),
+                "slope": float(rf.get("pitchDegrees", 30.0)),
+            }
+            if "offset" in rf:
+                roof_params["offset"] = float(rf["offset"])
+            elif "baseElevation" in rf:
+                host_level_name = rf.get("levelId", "Level 1")
+                host_level = next((l for l in levels if l.get("name") == host_level_name or l.get("id") == host_level_name), None)
+                host_elev = float(host_level.get("elevation", 0.0)) if host_level else 0.0
+                roof_params["offset"] = float(rf["baseElevation"]) - host_elev
+            else:
+                roof_params["offset"] = 3000.0
+
+            if "overhang" in rf and rf["overhang"] is not None:
+                roof_params["overhang"] = float(rf["overhang"])
+
+            # Gable ends: pass edge indices if gable roof
+            if roof_type == "gable":
+                gable_indices = rf.get("gableEdgeIndices")
+                if gable_indices:
+                    roof_params["gables"] = list(gable_indices)
+                else:
+                    roof_params["gable"] = True
+
+            cmds.append(("roof", roof_params))
+
+        # 6. Visual Views & Renderings (if configured)
         if views_config:
             # Elevation views
             if "elevation_south" in views_config:

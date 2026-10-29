@@ -46,11 +46,14 @@ dxf-to-3d-bim inspect path\to\plan.dxf --out-json preflight.json --out-md prefli
 # Single-storey floor plan
 dxf-to-3d-bim run path\to\plan.dxf --out deliverables
 
-# Two-storey building with repeated ground floor
-dxf-to-3d-bim run path\to\plan.dxf --storeys 2 --repeat-ground-floor --out deliverables
+# Single-storey with parametric gable roof
+dxf-to-3d-bim run path\to\plan.dxf --roof-type gable --roof-pitch 30.0 --roof-overhang 300.0 --out deliverables
+
+# Two-storey building with repeated ground floor and hip roof
+dxf-to-3d-bim run path\to\plan.dxf --storeys 2 --repeat-ground-floor --roof-type hip --roof-pitch 25.0 --out deliverables
 
 # Multi-storey with custom storey height or configuration
-dxf-to-3d-bim run path\to\plan.dxf --storeys 3 --storey-height 3200 --repeat-ground-floor --out deliverables
+dxf-to-3d-bim run path\to\plan.dxf --storeys 3 --storey-height 3200 --repeat-ground-floor --roof-type gable --out deliverables
 ```
 
 ### Headless Automated Run (Non-Interactive)
@@ -82,19 +85,23 @@ flowchart LR
 - Support **Multi-Storey Reconstruction**:
   - **Mode A (DXF Storey Layers)**: Automatically partitions geometry across storeys when layer qualifiers like `L1-WALL`, `L2-WALL`, `FL01-`, or `STOREY_2_` are present.
   - **Mode B (Configured / Repeated Storeys)**: Reconstructs multi-storey buildings via CLI flags (`--storeys`, `--storey-height`, `--ground-elevation`, `--repeat-ground-floor`, `--storey-config`). Silent replication without explicit approval or configuration is strictly prohibited.
+- Support **Parametric Roof Generation**:
+  - Computes exact parametric geometry for **Gable**, **Hip**, **Flat**, and **Shed** roofs.
+  - Automatically identifies short-edge gable ends on axis-aligned or rotated rectangular buildings, ridge endpoints, and bearing elevations ($E_{\text{bearing}} = E_{\text{top\_level}} + H_{\text{wall}}$).
+  - Positions roofs atop the top occupied storey while treating top datum levels (`roof_datum`) strictly as reference datums.
 - Produce intermediate model conforming to [`schemas/bim-model.schema.json`](file:///d:/Agent%20Skills/DXF%20to%203D-BIM/skills/dxf-to-3d-bim/schemas/bim-model.schema.json).
 - Refer to [`workflows/reconstruct-geometry.md`](file:///d:/Agent%20Skills/DXF%20to%203D-BIM/skills/dxf-to-3d-bim/workflows/reconstruct-geometry.md).
 
 ### Stage 3: Guided Approval Gate
-- Present the 7 architectural sections: Units/Scale, Walls, Openings, Slab, Storeys, Warnings, and Deliverables.
+- Present the architectural sections: Units/Scale, Walls, Openings, Slab, Storeys & Roof, Warnings, and Deliverables.
 - In interactive mode: allow user to accept, edit parameters, or cancel.
 - In non-interactive mode: verify pre-approved configuration and DXF hash match without terminal pauses.
 - Record version-locked approval in `analysis/approval_record.json` conforming to [`schemas/approval.schema.json`](file:///d:/Agent%20Skills/DXF%20to%203D-BIM/skills/dxf-to-3d-bim/schemas/approval.schema.json).
 - Refer to [`workflows/approve-model.md`](file:///d:/Agent%20Skills/DXF%20to%203D-BIM/skills/dxf-to-3d-bim/workflows/approve-model.md).
 
 ### Stage 4: BIM Construction (BIMCraft Backend)
-- Execute verified BIMCraft CLI 0.9.0 commands (`wall`, `floor`, `door`, `window`, `elevation`, `section`, `render`).
-- Construct elements in strict order: Levels → Walls → Slabs → Hosted Doors/Windows → Rooms.
+- Execute verified BIMCraft CLI 0.9.0 commands (`wall`, `floor`, `door`, `window`, `roof`, `elevation`, `section`, `render`).
+- Construct elements in strict order: Levels → Walls → Slabs → Hosted Doors/Windows → Roof → Rooms.
 - Save native project into `models/<project>.bimcraft` and export standard IFC4 into `models/<project>.ifc`.
 - Render plan preview into `previews/<project>.png`, 3D axonometric into `previews/<project>_3d.png`, and elevations/sections.
 - Refer to [`workflows/generate-bim.md`](file:///d:/Agent%20Skills/DXF%20to%203D-BIM/skills/dxf-to-3d-bim/workflows/generate-bim.md).

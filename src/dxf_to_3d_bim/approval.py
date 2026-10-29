@@ -48,6 +48,7 @@ class ApprovalGate:
         walls = d.get("walls", [])
         openings = d.get("openings", [])
         floors = d.get("floors", [])
+        roofs = d.get("roofs", [])
         assumptions = d.get("assumptions", [])
 
         ext_walls = [w for w in walls if w.get("classification") == "exterior"]
@@ -69,6 +70,21 @@ class ApprovalGate:
         storeys_count = len(inhabited) if inhabited else (len(levels_list) - 1 if len(levels_list) > 1 else 1)
         storeys_count = max(1, storeys_count)
 
+        vert_params: Dict[str, Any] = {
+            "storeys": storeys_count,
+            "wall_height_mm": walls[0].get("height", 3000.0) if walls else 3000.0,
+            "slab_thickness_mm": floors[0].get("thickness", 150.0) if floors else 150.0,
+            "window_sill_height_mm": windows[0].get("sillHeight", 900.0) if windows else 900.0,
+            "levels_breakdown": model.get_levels_summary() if hasattr(model, "get_levels_summary") else [],
+        }
+        if roofs:
+            r0 = roofs[0]
+            vert_params["roof_type"] = r0.get("roofType", "none")
+            vert_params["roof_pitch_deg"] = r0.get("pitchDegrees", 30.0)
+            vert_params["roof_overhang_mm"] = r0.get("overhang", 300.0)
+            vert_params["roof_thickness_mm"] = r0.get("thickness", 200.0)
+            vert_params["roof_base_elevation_mm"] = r0.get("baseElevation", 0.0)
+
         return {
             "projectName": d.get("metadata", {}).get("projectName", "Project"),
             "modelHash": compute_model_hash(d),
@@ -83,14 +99,9 @@ class ApprovalGate:
                 "doors": len(doors),
                 "windows": len(windows),
                 "floors": len(floors),
+                "roofs": len(roofs),
             },
-            "proposed_vertical_parameters": {
-                "storeys": storeys_count,
-                "wall_height_mm": walls[0].get("height", 3000.0) if walls else 3000.0,
-                "slab_thickness_mm": floors[0].get("thickness", 150.0) if floors else 150.0,
-                "window_sill_height_mm": windows[0].get("sillHeight", 900.0) if windows else 900.0,
-                "levels_breakdown": model.get_levels_summary() if hasattr(model, "get_levels_summary") else [],
-            },
+            "proposed_vertical_parameters": vert_params,
             "uncertainties": assumptions,
         }
 
@@ -128,6 +139,18 @@ class ApprovalGate:
         summary = ApprovalGate.generate_proposal_summary(model)
         vert = summary["proposed_vertical_parameters"]
 
+        approved_params: Dict[str, Any] = {
+            "storeyCount": vert["storeys"],
+            "wallHeight": vert["wall_height_mm"],
+            "slabThickness": vert["slab_thickness_mm"],
+        }
+        if "roof_type" in vert:
+            approved_params["roofType"] = vert["roof_type"]
+            approved_params["roofPitch"] = vert["roof_pitch_deg"]
+            approved_params["roofOverhang"] = vert["roof_overhang_mm"]
+            approved_params["roofThickness"] = vert["roof_thickness_mm"]
+            approved_params["roofBaseElevation"] = vert["roof_base_elevation_mm"]
+
         approval_record: Dict[str, Any] = {
             "projectName": model.data.get("metadata", {}).get("projectName", "Project"),
             "modelHash": model_hash,
@@ -135,11 +158,7 @@ class ApprovalGate:
             "approvedBy": approved_by,
             "timestamp": now_iso,
             "approvalMethod": approval_method,
-            "approvedParameters": {
-                "storeyCount": vert["storeys"],
-                "wallHeight": vert["wall_height_mm"],
-                "slabThickness": vert["slab_thickness_mm"],
-            },
+            "approvedParameters": approved_params,
             "notes": notes,
         }
         if dxf_hash:

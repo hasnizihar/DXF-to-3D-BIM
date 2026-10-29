@@ -56,6 +56,16 @@
         "elevation": { "type": "number" }
       }
     },
+    "roof": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "roof_type": { "type": "string", "enum": ["none", "flat", "gable", "hip", "shed"] },
+        "pitch_degrees": { "type": "number", "minimum": 0, "maximum": 89.9 },
+        "overhang": { "type": "number", "minimum": 0 },
+        "thickness": { "type": "number", "minimum": 0 }
+      }
+    },
     "tolerances": {
       "type": "object",
       "properties": {

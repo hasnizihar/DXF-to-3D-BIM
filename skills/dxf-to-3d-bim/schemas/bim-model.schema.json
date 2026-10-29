@@ -175,10 +175,39 @@
         "required": ["id", "roofType", "levelId"],
         "properties": {
           "id": { "type": "string" },
-          "roofType": { "type": "string", "enum": ["flat", "gable", "hip", "shed"] },
+          "roofType": { "type": "string", "enum": ["none", "flat", "gable", "hip", "shed"] },
           "levelId": { "type": "string" },
-          "pitchDegrees": { "type": "number" },
-          "overhang": { "type": "number" }
+          "baseElevation": { "type": "number" },
+          "pitchDegrees": { "type": "number", "minimum": 0, "maximum": 89.9 },
+          "overhang": { "type": "number", "minimum": 0 },
+          "thickness": { "type": "number", "minimum": 0 },
+          "boundary": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": { "type": "number" },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "minItems": 3
+          },
+          "ridgeEndpoints": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": { "type": "number" },
+              "minItems": 3,
+              "maxItems": 3
+            }
+          },
+          "ridgeElevation": { "type": "number" },
+          "gableEdgeIndices": {
+            "type": "array",
+            "items": { "type": "integer", "minimum": 0 }
+          },
+          "areaM2": { "type": "number", "minimum": 0 },
+          "provenance": { "type": "string" },
+          "confidence": { "type": "string", "enum": ["high", "medium", "low"] }
         }
       }
     },

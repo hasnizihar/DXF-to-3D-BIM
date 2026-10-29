@@ -35,6 +35,7 @@ class IntermediateBimModel:
         repeat_ground_floor: bool = False,
         storey_config: Optional[Dict[str, Any]] = None,
         levels_override: Optional[List[Dict[str, Any]]] = None,
+        roofs: Optional[List[Dict[str, Any]]] = None,
     ) -> "IntermediateBimModel":
         now_iso = datetime.now(timezone.utc).isoformat()
 
@@ -253,7 +254,7 @@ class IntermediateBimModel:
             "openings": opening_dicts,
             "floors": floor_dicts,
             "rooms": room_dicts,
-            "roofs": [],
+            "roofs": roofs if roofs is not None else [],
             "assumptions": assumptions or [],
             "approval": {
                 "isApproved": False,
@@ -396,6 +397,7 @@ class IntermediateBimModel:
         walls = self.data.get("walls", [])
         openings = self.data.get("openings", [])
         floors = self.data.get("floors", [])
+        roofs = self.data.get("roofs", [])
 
         for lvl in self.data.get("levels", []):
             lname = lvl.get("name")
@@ -403,6 +405,7 @@ class IntermediateBimModel:
             lvl_walls = [w for w in walls if w.get("levelId") in (lname, lid)]
             lvl_ops = [op for op in openings if op.get("levelId") in (lname, lid)]
             lvl_fls = [fl for fl in floors if fl.get("levelId") in (lname, lid)]
+            lvl_roofs = [r for r in roofs if r.get("levelId") in (lname, lid)]
             summary.append({
                 "id": lid,
                 "name": lname,
@@ -412,6 +415,7 @@ class IntermediateBimModel:
                 "walls": len(lvl_walls),
                 "openings": len(lvl_ops),
                 "floors": len(lvl_fls),
+                "roofs": len(lvl_roofs),
             })
         return summary
 

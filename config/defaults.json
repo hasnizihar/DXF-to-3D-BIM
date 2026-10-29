@@ -36,6 +36,13 @@
   "slab": {
     "thickness": 150.0,
     "elevation": 0.0
+  },
+  "roof": {
+    "enabled": false,
+    "roof_type": "none",
+    "pitch_degrees": 30.0,
+    "overhang": 300.0,
+    "thickness": 200.0
   }
 }
 

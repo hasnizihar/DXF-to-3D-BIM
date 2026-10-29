@@ -211,14 +211,52 @@ class ModelValidator:
             "numericalDifference": float(win_diff),
         })
 
+        # Roof Element Count & Type Checks
+        expected_roofs = len([r for r in model.data.get("roofs", []) if r.get("roofType") not in ("none", None)])
+        gen_roofs = actual_counts.get("roof", 0)
+        roof_diff = abs(gen_roofs - expected_roofs)
+        if expected_roofs > 0 or gen_roofs > 0:
+            checks.append({
+                "category": "Geometric Topology",
+                "name": "Roof Element Count",
+                "status": "PASSED" if roof_diff == 0 else "WARNING",
+                "details": f"Expected {expected_roofs} roof(s), found {gen_roofs} in IFC",
+                "numericalDifference": float(roof_diff),
+            })
+
+            # Check IFC roof attributes if parsed
+            if expected_roofs > 0 and ifc_sem and ifc_sem.roofs:
+                model_roof = [r for r in model.data.get("roofs", []) if r.get("roofType") not in ("none", None)][0]
+                expected_type = model_roof.get("roofType", "").upper()
+                actual_type = ifc_sem.roofs[0].get("predefined_type", "")
+                type_match = (expected_type in actual_type) or (actual_type in expected_type)
+                checks.append({
+                    "category": "Geometric Topology",
+                    "name": "Roof Predefined Type",
+                    "status": "PASSED" if type_match else "WARNING",
+                    "details": f"Expected {expected_type}_ROOF, found {actual_type} in IFC",
+                })
+
+                host_level_id = model_roof.get("levelId", "Level 1")
+                actual_host = ifc_sem.roofs[0].get("contained_in_storey")
+                containment_match = (actual_host == host_level_id)
+                checks.append({
+                    "category": "Spatial Structure",
+                    "name": "Roof Spatial Containment",
+                    "status": "PASSED" if containment_match else "WARNING",
+                    "details": f"Roof is contained in host storey '{actual_host}' (expected '{host_level_id}')",
+                })
+
         # Storey Count Check
         if gen_levels > 0:
             level_diff = abs(gen_levels - expected_levels)
+            inhabited_levels = len([l for l in model.data.get("levels", []) if l.get("storeyType") != "roof_datum"])
+            datum_levels = expected_levels - inhabited_levels
             checks.append({
                 "category": "Spatial Structure",
                 "name": "Storey Level Count",
                 "status": "PASSED" if level_diff == 0 else "WARNING",
-                "details": f"Expected {expected_levels} storeys/levels, found {gen_levels} in IFC",
+                "details": f"Expected {expected_levels} levels ({inhabited_levels} occupied storeys, {datum_levels} roof datum), found {gen_levels} in IFC",
                 "numericalDifference": float(level_diff),
             })
 
@@ -256,12 +294,14 @@ class ModelValidator:
                     "doors": expected_doors,
                     "windows": expected_windows,
                     "levels": expected_levels,
+                    "roofs": expected_roofs,
                 },
                 "generated": {
                     "walls": gen_walls,
                     "doors": gen_doors,
                     "windows": gen_windows,
                     "levels": gen_levels,
+                    "roofs": gen_roofs,
                 },
             },
             "deliverables": {
@@ -362,6 +402,29 @@ class ModelValidator:
                         "name": f"Floor Slab {fl.get('id', 'fl')} Boundary",
                         "status": "FAILED",
                         "details": "Slab boundary polygon is self-intersecting or invalid.",
+                    })
+
+        # 3. Roof Boundary & Parameter Check
+        for rf in d.get("roofs", []):
+            if rf.get("roofType") in ("none", None):
+                continue
+            boundary = rf.get("boundary", [])
+            pitch = float(rf.get("pitchDegrees", 30.0))
+            if len(boundary) >= 3:
+                poly = Polygon(boundary)
+                if poly.is_valid and poly.area > 100_000.0:
+                    results.append({
+                        "category": "Geometric Topology",
+                        "name": f"Roof {rf.get('id', 'rf')} Footprint Boundary",
+                        "status": "PASSED",
+                        "details": f"Roof footprint is a valid polygon ({poly.area / 1_000_000.0:.2f} m²), pitch {pitch:.1f}°.",
+                    })
+                else:
+                    results.append({
+                        "category": "Geometric Topology",
+                        "name": f"Roof {rf.get('id', 'rf')} Footprint Boundary",
+                        "status": "FAILED",
+                        "details": "Roof boundary polygon is degenerate or invalid.",
                     })
 
         return results

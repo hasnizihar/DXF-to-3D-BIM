@@ -47,6 +47,7 @@ class ReviewSummaryGenerator:
         doors = [op for op in d.get("openings", []) if op.get("type") == "door"]
         windows = [op for op in d.get("openings", []) if op.get("type") == "window"]
         floors = d.get("floors", [])
+        roofs = [r for r in d.get("roofs", []) if r.get("roofType") not in ("none", None)]
 
         # Build Markdown
         md = []
@@ -76,16 +77,19 @@ class ReviewSummaryGenerator:
         md.append(f"| **Hosted Doors** | {len(doors)} | {gen.get('doors', 'N/A')} | {'PASSED' if gen.get('doors') == len(doors) else 'VERIFY'} |")
         md.append(f"| **Hosted Windows** | {len(windows)} | {gen.get('windows', 'N/A')} | {'PASSED' if gen.get('windows') == len(windows) else 'VERIFY'} |")
         md.append(f"| **Floor Slabs** | {len(floors)} | {len(floors)} | PASSED |")
+        if roofs:
+            r0 = roofs[0]
+            md.append(f"| **Parametric Roof** | 1 ({r0.get('roofType', 'none')}, {r0.get('pitchDegrees', 30.0)}°) | {gen.get('roofs', 'N/A')} | {'PASSED' if gen.get('roofs') == 1 else 'VERIFY'} |")
         md.append("")
 
         # Storey Breakdown table if multi-storey or levels exist
         levels_summary = model.get_levels_summary() if hasattr(model, "get_levels_summary") else []
         if levels_summary:
             md.append("### Storey & Level Spatial Structure")
-            md.append("| Level Name | Base Elevation (mm) | Height (mm) | Storey Type | Walls | Slabs |")
-            md.append("| :--- | :--- | :--- | :--- | :--- | :--- |")
+            md.append("| Level Name | Base Elevation (mm) | Height (mm) | Storey Type | Walls | Slabs | Roofs |")
+            md.append("| :--- | :--- | :--- | :--- | :--- | :--- | :--- |")
             for lvl in levels_summary:
-                md.append(f"| **{lvl['name']}** | {lvl['elevation']:.1f} | {lvl['height']:.1f} | {lvl.get('storeyType', 'standard')} | {lvl['walls']} | {lvl['floors']} |")
+                md.append(f"| **{lvl['name']}** | {lvl['elevation']:.1f} | {lvl['height']:.1f} | {lvl.get('storeyType', 'standard')} | {lvl['walls']} | {lvl['floors']} | {lvl.get('roofs', 0)} |")
             md.append("")
 
         md.append("---")

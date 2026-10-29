@@ -72,6 +72,14 @@ class SlabConfig(BaseModel):
     elevation: float = 0.0
 
 
+class RoofConfig(BaseModel):
+    enabled: bool = False
+    roof_type: str = "none"  # "none", "gable", "hip", "flat", "shed"
+    pitch_degrees: float = 30.0
+    overhang: float = 300.0
+    thickness: float = 200.0
+
+
 class TolerancesConfig(BaseModel):
     endpoint_snap: float = 25.0
     collinear_distance: float = 5.0
@@ -92,6 +100,7 @@ class ProjectConfig(BaseModel):
     walls: WallsConfig = Field(default_factory=WallsConfig)
     openings: OpeningsConfig = Field(default_factory=OpeningsConfig)
     slab: SlabConfig = Field(default_factory=SlabConfig)
+    roof: RoofConfig = Field(default_factory=RoofConfig)
     tolerances: TolerancesConfig = Field(default_factory=TolerancesConfig)
     layer_aliases: Optional[Dict[str, Any]] = None
     ignored_layers: List[str] = Field(default_factory=list)

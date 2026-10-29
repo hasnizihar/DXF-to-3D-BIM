@@ -22,6 +22,7 @@ from dxf_to_3d_bim.manifest import RunManifest, file_sha256
 from dxf_to_3d_bim.opening_detection import OpeningDetector
 from dxf_to_3d_bim.preflight import PreflightAnalyzer, PreflightStatus, ScaleConfidence
 from dxf_to_3d_bim.reporting import ReviewSummaryGenerator, compute_file_sha256
+from dxf_to_3d_bim.roof_engine import ParametricRoofEngine
 from dxf_to_3d_bim.room_detection import SpatialDetector
 from dxf_to_3d_bim.validator import ModelValidator
 from dxf_to_3d_bim.wall_reconstruction import WallReconstructor
@@ -110,6 +111,10 @@ def reconstruct_dxf_model(
     repeat_ground_floor: bool = False,
     storey_config_path: Optional[str] = None,
     interactive_prompt: bool = True,
+    roof_type: str = "none",
+    roof_pitch: float = 30.0,
+    roof_overhang: float = 300.0,
+    roof_thickness: float = 200.0,
 ) -> IntermediateBimModel:
     """Reconstructs IntermediateBimModel from DXF supporting Mode A (layers) and Mode B (configured/repeated)."""
     if storeys < 1:
@@ -183,6 +188,30 @@ def reconstruct_dxf_model(
             curr_elev += storey_height
 
         storeys_effective = max(len(sorted_storeys), storeys)
+
+        roofs = []
+        if roof_type and roof_type.strip().lower() != "none":
+            top_idx = max(sorted_storeys)
+            top_level_name = f"Level {top_idx}"
+            top_level_elev = ground_elevation + (top_idx - 1) * storey_height
+            dummy_data = {
+                "floors": [{"boundary": fl.boundary, "levelId": fl.level_id} for fl in all_floors],
+                "walls": [{"start": w.start, "end": w.end, "levelId": w.level_id, "classification": w.classification} for w in all_walls],
+            }
+            footprint = ParametricRoofEngine.derive_roof_footprint_from_model(dummy_data, top_level_name)
+            rf_geom = ParametricRoofEngine.generate_roof(
+                footprint=footprint,
+                top_level_name=top_level_name,
+                top_level_elevation=top_level_elev,
+                top_wall_height=storey_height,
+                roof_type=roof_type,
+                pitch_degrees=roof_pitch,
+                overhang=roof_overhang,
+                thickness=roof_thickness,
+            )
+            if rf_geom:
+                roofs.append(rf_geom.to_dict())
+
         return IntermediateBimModel.create(
             project_name=Path(dxf_path).stem,
             source_dxf_path=str(Path(dxf_path).resolve()),
@@ -192,6 +221,7 @@ def reconstruct_dxf_model(
             openings=all_openings,
             floors=all_floors,
             rooms=all_rooms,
+            roofs=roofs,
             assumptions=all_assumptions,
             storeys_count=storeys_effective,
             storey_heights=[storey_height] * storeys_effective,
@@ -239,6 +269,29 @@ def reconstruct_dxf_model(
             "status": "unresolved",
         })
 
+    roofs = []
+    if roof_type and roof_type.strip().lower() != "none":
+        top_idx = storeys
+        top_level_name = f"Level {top_idx}" if storeys > 1 else "Level 1"
+        top_level_elev = ground_elevation + (top_idx - 1) * storey_height
+        dummy_data = {
+            "floors": [{"boundary": fl.boundary, "levelId": fl.level_id} for fl in floors],
+            "walls": [{"start": w.start, "end": w.end, "levelId": w.level_id, "classification": w.classification} for w in walls],
+        }
+        footprint = ParametricRoofEngine.derive_roof_footprint_from_model(dummy_data, top_level_name)
+        rf_geom = ParametricRoofEngine.generate_roof(
+            footprint=footprint,
+            top_level_name=top_level_name,
+            top_level_elevation=top_level_elev,
+            top_wall_height=storey_height,
+            roof_type=roof_type,
+            pitch_degrees=roof_pitch,
+            overhang=roof_overhang,
+            thickness=roof_thickness,
+        )
+        if rf_geom:
+            roofs.append(rf_geom.to_dict())
+
     return IntermediateBimModel.create(
         project_name=Path(dxf_path).stem,
         source_dxf_path=str(Path(dxf_path).resolve()),
@@ -248,6 +301,7 @@ def reconstruct_dxf_model(
         openings=openings,
         floors=floors,
         rooms=rooms,
+        roofs=roofs,
         assumptions=assumptions,
         storeys_count=storeys,
         storey_heights=[storey_height] * storeys,
@@ -267,6 +321,10 @@ def prepare(
     ground_elevation: float = typer.Option(0.0, "--ground-elevation", help="Ground floor elevation in mm (default 0.0)"),
     repeat_ground_floor: bool = typer.Option(False, "--repeat-ground-floor", help="Replicate ground floor footprint across upper storeys"),
     storey_config: Optional[str] = typer.Option(None, "--storey-config", help="Path to JSON file with custom storey definitions"),
+    roof_type: str = typer.Option("none", "--roof-type", help="Parametric roof type: none, gable, hip, flat, shed"),
+    roof_pitch: float = typer.Option(30.0, "--roof-pitch", help="Roof pitch in degrees (default 30.0)"),
+    roof_overhang: float = typer.Option(300.0, "--roof-overhang", help="Roof eave overhang in mm (default 300.0)"),
+    roof_thickness: float = typer.Option(200.0, "--roof-thickness", help="Roof thickness in mm (default 200.0)"),
 ):
     """Parses DXF, reconstructs geometry, and creates an intermediate model awaiting approval."""
     if json_path and Path(json_path).exists():
@@ -289,6 +347,10 @@ def prepare(
             repeat_ground_floor=repeat_ground_floor,
             storey_config_path=storey_config,
             interactive_prompt=True,
+            roof_type=roof_type,
+            roof_pitch=roof_pitch,
+            roof_overhang=roof_overhang,
+            roof_thickness=roof_thickness,
         )
 
     saved_path = model.save(output_path)
@@ -406,6 +468,10 @@ def run(
     ground_elevation: float = typer.Option(0.0, "--ground-elevation", help="Ground floor elevation in mm (default 0.0)"),
     repeat_ground_floor: bool = typer.Option(False, "--repeat-ground-floor", help="Replicate ground floor footprint across upper storeys"),
     storey_config: Optional[str] = typer.Option(None, "--storey-config", help="Path to JSON file with custom storey definitions"),
+    roof_type: str = typer.Option("none", "--roof-type", help="Parametric roof type: none, gable, hip, flat, shed"),
+    roof_pitch: float = typer.Option(30.0, "--roof-pitch", help="Roof pitch in degrees (default 30.0)"),
+    roof_overhang: float = typer.Option(300.0, "--roof-overhang", help="Roof eave overhang in mm (default 300.0)"),
+    roof_thickness: float = typer.Option(200.0, "--roof-thickness", help="Roof thickness in mm (default 200.0)"),
     non_interactive: bool = typer.Option(False, "--non-interactive", help="Run without terminal prompts (requires config or auto-approve)"),
     auto_approve: bool = typer.Option(False, "--auto-approve", help="Simulate human approval for automated headless testing"),
     views: bool = typer.Option(True, "--views/--no-views", help="Generate 3D isometric, elevation, and section views"),
@@ -507,6 +573,16 @@ def run(
     eff_repeat = repeat_ground_floor or cfg.levels.repeat_ground_floor
     eff_config_path = storey_config or cfg.levels.storey_config_path
 
+    eff_roof_type = roof_type
+    eff_roof_pitch = roof_pitch
+    eff_roof_overhang = roof_overhang
+    eff_roof_thickness = roof_thickness
+    if eff_roof_type == "none" and cfg.roof.enabled:
+        eff_roof_type = cfg.roof.roof_type
+        eff_roof_pitch = cfg.roof.pitch_degrees
+        eff_roof_overhang = cfg.roof.overhang
+        eff_roof_thickness = cfg.roof.thickness
+
     try:
         model = reconstruct_dxf_model(
             dxf_path=input_path,
@@ -520,6 +596,10 @@ def run(
             repeat_ground_floor=eff_repeat,
             storey_config_path=eff_config_path,
             interactive_prompt=not non_interactive and not auto_approve,
+            roof_type=eff_roof_type,
+            roof_pitch=eff_roof_pitch,
+            roof_overhang=eff_roof_overhang,
+            roof_thickness=eff_roof_thickness,
         )
     except Exception as e:
         console.print(f"[bold red]Reconstruction error:[/bold red] {e}")

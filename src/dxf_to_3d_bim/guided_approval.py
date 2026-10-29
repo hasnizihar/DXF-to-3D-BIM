@@ -92,21 +92,40 @@ class GuidedApprovalSession:
         t5.add_column("Level / Storey", style="cyan")
         t5.add_column("Base Elevation (mm)", style="green")
         t5.add_column("Height (mm)", style="green")
-        t5.add_column("Walls / Slabs", style="white")
+        t5.add_column("Walls / Slabs / Roofs", style="white")
 
         breakdown = vert.get("levels_breakdown", [])
         if breakdown:
             for b in breakdown:
+                elem_desc = f"{b['walls']} walls, {b['floors']} slabs"
+                if b.get("roofs", 0) > 0:
+                    elem_desc += f", {b['roofs']} roof"
                 t5.add_row(
                     f"{b['name']} ({b.get('storeyType', 'standard')})",
                     f"{b['elevation']:.1f}",
                     f"{b['height']:.1f}",
-                    f"{b['walls']} walls, {b['floors']} slabs",
+                    elem_desc,
                 )
         else:
             t5.add_row("Level 1 (Ground)", "0.0", f"{vert['wall_height_mm']:.1f}", "Ground Floor")
             t5.add_row("Level 2 (Ceiling/Roof Datum)", f"{vert['wall_height_mm']:.1f}", "0.0", "Roof Datum")
         self.console.print(t5)
+
+        # Section 5b: Parametric Roof (if configured)
+        roofs = self.model.data.get("roofs", [])
+        if roofs and roofs[0].get("roofType") not in ("none", None):
+            rf = roofs[0]
+            t_roof = Table(title="Section 5b: Parametric Roof Specification")
+            t_roof.add_column("Parameter", style="cyan")
+            t_roof.add_column("Approved Value", style="green")
+            t_roof.add_row("Roof Type", rf.get("roofType", "none").upper())
+            t_roof.add_row("Host Spatial Storey", rf.get("levelId", "Level 1"))
+            t_roof.add_row("Bearing Elevation", f"{rf.get('baseElevation', 0.0):.1f} mm")
+            t_roof.add_row("Slope / Pitch", f"{rf.get('pitchDegrees', 30.0):.1f}°")
+            t_roof.add_row("Eave Overhang", f"{rf.get('overhang', 300.0):.1f} mm")
+            t_roof.add_row("Ridge Elevation", f"{rf.get('ridgeElevation', 0.0):.1f} mm")
+            t_roof.add_row("Roof Plan Area", f"{rf.get('areaM2', 0.0):.2f} m²")
+            self.console.print(t_roof)
 
         # Section 6: Warnings & Uncertainties
         t6 = Table(title="Section 6: Uncertain Geometry & Preflight Warnings")
@@ -148,6 +167,38 @@ class GuidedApprovalSession:
         for op in self.model.data.get("openings", []):
             if op.get("type") == "window":
                 op["sillHeight"] = float(new_sill_mm)
+
+    def update_roof_parameters(
+        self,
+        pitch_degrees: Optional[float] = None,
+        overhang: Optional[float] = None,
+    ):
+        roofs = self.model.data.get("roofs", [])
+        if not roofs:
+            return
+        rf = roofs[0]
+        if pitch_degrees is not None:
+            rf["pitchDegrees"] = float(pitch_degrees)
+        if overhang is not None:
+            rf["overhang"] = float(overhang)
+
+        from dxf_to_3d_bim.roof_engine import ParametricRoofEngine
+        recomputed = ParametricRoofEngine.generate_roof(
+            footprint=rf["boundary"],
+            top_level_name=rf["levelId"],
+            top_level_elevation=rf.get("baseElevation", 3000.0) - 3000.0,
+            top_wall_height=3000.0,
+            roof_type=rf["roofType"],
+            pitch_degrees=rf["pitchDegrees"],
+            overhang=rf["overhang"],
+            thickness=rf.get("thickness", 200.0),
+            roof_id=rf.get("id", "roof_1"),
+        )
+        if recomputed:
+            rf["ridgeEndpoints"] = [[round(r[0], 2), round(r[1], 2), round(r[2], 2)] for r in recomputed.ridge_endpoints]
+            rf["ridgeElevation"] = round(recomputed.ridge_elevation, 2)
+            rf["gableEdgeIndices"] = recomputed.gable_edge_indices
+            rf["areaM2"] = round(recomputed.area_m2, 2)
 
     def run_guided_session(
         self,
@@ -201,9 +252,14 @@ class GuidedApprovalSession:
             ))
             self.console.print("  [4] Edit Window Sill Height")
             self.console.print("  [5] Reject / Cancel Generation")
+            has_roof = bool(self.model.data.get("roofs") and self.model.data["roofs"][0].get("roofType") not in ("none", None))
+            if has_roof:
+                rf = self.model.data["roofs"][0]
+                self.console.print(f"  [6] Edit Roof Parameters (Pitch: {rf.get('pitchDegrees', 30.0)}°, Overhang: {rf.get('overhang', 300.0)} mm)")
 
             try:
-                choice = input("\nEnter option (1-5) [1]: ").strip()
+                prompt_text = "\nEnter option (1-6) [1]: " if has_roof else "\nEnter option (1-5) [1]: "
+                choice = input(prompt_text).strip()
             except (EOFError, KeyboardInterrupt):
                 raise PermissionError("Approval aborted by user.")
 
@@ -257,5 +313,16 @@ class GuidedApprovalSession:
 
             elif choice == "5":
                 raise PermissionError("Generation cancelled: User rejected proposal parameters.")
+            elif choice == "6" and has_roof:
+                p_val = input("Enter new roof pitch in degrees (e.g. 35.0) [leave blank to keep]: ").strip()
+                o_val = input("Enter new roof overhang in mm (e.g. 400.0) [leave blank to keep]: ").strip()
+                try:
+                    p = float(p_val) if p_val else None
+                    o = float(o_val) if o_val else None
+                    self.update_roof_parameters(pitch_degrees=p, overhang=o)
+                    self.console.print("[green]Roof parameters updated.[/green]")
+                except ValueError:
+                    self.console.print("[red]Invalid numerical value.[/red]")
             else:
-                self.console.print("[red]Unrecognized option. Enter 1-5.[/red]")
+                max_opt = "1-6" if has_roof else "1-5"
+                self.console.print(f"[red]Unrecognized option. Enter {max_opt}.[/red]")
