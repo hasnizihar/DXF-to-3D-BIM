@@ -1,0 +1,77 @@
+{
+  "timestamp": "2026-10-29T18:33:17.761801+00:00",
+  "projectName": "simple_room",
+  "overallStatus": "PASSED",
+  "checks": [
+    {
+      "category": "Export Deliverables",
+      "name": "Native BIMCraft Project File Verification",
+      "status": "PASSED",
+      "details": "File exists at simple_room.bimcraft with size 157060 bytes"
+    },
+    {
+      "category": "Export Deliverables",
+      "name": "IFC4 Export File Verification",
+      "status": "PASSED",
+      "details": "File exists at simple_room.ifc with size 8349 bytes"
+    },
+    {
+      "category": "Export Deliverables",
+      "name": "Plan Preview PNG File Verification",
+      "status": "PASSED",
+      "details": "File exists at simple_room.png with size 94999 bytes"
+    },
+    {
+      "category": "Native Project Inspection",
+      "name": "Reopen Native Project",
+      "status": "PASSED",
+      "details": "Successfully reopened and inspected .bimcraft project structure"
+    },
+    {
+      "category": "IFC Verification",
+      "name": "Parse IFC Model",
+      "status": "PASSED",
+      "details": "IFC4 parsed successfully. Units: mm"
+    },
+    {
+      "category": "Geometric Topology",
+      "name": "Wall Element Count",
+      "status": "PASSED",
+      "details": "Expected 4 walls, found 4 in IFC",
+      "numericalDifference": 0.0
+    },
+    {
+      "category": "Geometric Topology",
+      "name": "Door Opening Count",
+      "status": "PASSED",
+      "details": "Expected 1 doors, found 1 in IFC",
+      "numericalDifference": 0.0
+    },
+    {
+      "category": "Geometric Topology",
+      "name": "Window Opening Count",
+      "status": "PASSED",
+      "details": "Expected 1 windows, found 1 in IFC",
+      "numericalDifference": 0.0
+    }
+  ],
+  "elementSummary": {
+    "expected": {
+      "walls": 4,
+      "doors": 1,
+      "windows": 1,
+      "levels": 2
+    },
+    "generated": {
+      "walls": 4,
+      "doors": 1,
+      "windows": 1,
+      "levels": 2
+    }
+  },
+  "deliverables": {
+    "bimcraftPath": "output_test\\simple_room.bimcraft",
+    "ifcPath": "output_test\\simple_room.ifc",
+    "previewPngPath": "output_test\\simple_room.png"
+  }
+}

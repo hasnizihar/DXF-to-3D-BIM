@@ -1,0 +1,190 @@
+{
+  "schemaVersion": "1.0.0",
+  "metadata": {
+    "projectName": "simple_room",
+    "sourceDxfPath": ".\\tests\\fixtures\\simple_room.dxf",
+    "createdAt": "2026-10-29T18:33:17.630437+00:00",
+    "updatedAt": "2026-10-29T18:33:17.644745+00:00"
+  },
+  "status": "approved",
+  "units": {
+    "sourceUnits": "mm",
+    "normalizedUnits": "mm",
+    "scaleFactor": 1.0,
+    "originOffset": [
+      0.0,
+      0.0
+    ]
+  },
+  "levels": [
+    {
+      "id": "level_1",
+      "name": "Level 1",
+      "elevation": 0.0,
+      "height": 3000.0
+    },
+    {
+      "id": "level_2",
+      "name": "Level 2",
+      "elevation": 3000.0,
+      "height": 3000.0
+    }
+  ],
+  "walls": [
+    {
+      "id": "wall_1",
+      "classification": "exterior",
+      "start": [
+        100.0,
+        100.0
+      ],
+      "end": [
+        5900.0,
+        100.0
+      ],
+      "thickness": 200.0,
+      "height": 3000.0,
+      "levelId": "Level 1",
+      "confidence": "high",
+      "sourceEntities": [
+        "34",
+        "38"
+      ]
+    },
+    {
+      "id": "wall_2",
+      "classification": "exterior",
+      "start": [
+        5900.0,
+        100.0
+      ],
+      "end": [
+        5900.0,
+        3900.0
+      ],
+      "thickness": 200.0,
+      "height": 3000.0,
+      "levelId": "Level 1",
+      "confidence": "high",
+      "sourceEntities": [
+        "35",
+        "39"
+      ]
+    },
+    {
+      "id": "wall_3",
+      "classification": "exterior",
+      "start": [
+        5900.0,
+        3900.0
+      ],
+      "end": [
+        100.0,
+        3900.0
+      ],
+      "thickness": 200.0,
+      "height": 3000.0,
+      "levelId": "Level 1",
+      "confidence": "high",
+      "sourceEntities": [
+        "36",
+        "3A"
+      ]
+    },
+    {
+      "id": "wall_4",
+      "classification": "exterior",
+      "start": [
+        100.0,
+        3900.0
+      ],
+      "end": [
+        100.0,
+        100.0
+      ],
+      "thickness": 200.0,
+      "height": 3000.0,
+      "levelId": "Level 1",
+      "confidence": "high",
+      "sourceEntities": [
+        "37",
+        "3B"
+      ]
+    }
+  ],
+  "openings": [
+    {
+      "id": "door_1",
+      "type": "door",
+      "wallId": "wall_1",
+      "center": [
+        2550.0,
+        100.0
+      ],
+      "width": 900.0,
+      "height": 2100.0,
+      "confidence": "high",
+      "swing": "single"
+    },
+    {
+      "id": "window_2",
+      "type": "window",
+      "wallId": "wall_2",
+      "center": [
+        5900.0,
+        2000.0
+      ],
+      "width": 1200.0,
+      "height": 1200.0,
+      "confidence": "high",
+      "sillHeight": 900.0
+    }
+  ],
+  "floors": [
+    {
+      "id": "floor_1",
+      "levelId": "Level 1",
+      "thickness": 150.0,
+      "elevation": 0.0,
+      "boundary": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          6000.0,
+          0.0
+        ],
+        [
+          6000.0,
+          4000.0
+        ],
+        [
+          0.0,
+          4000.0
+        ]
+      ]
+    }
+  ],
+  "rooms": [
+    {
+      "id": "room_1",
+      "name": "Living Room",
+      "levelId": "Level 1",
+      "approximateArea": 24.0,
+      "labelPosition": [
+        3000.0,
+        2000.0
+      ]
+    }
+  ],
+  "roofs": [],
+  "assumptions": [],
+  "approval": {
+    "isApproved": true,
+    "approvedBy": "Automated Test Runner",
+    "approvedAt": "2026-10-29T18:33:17.644745+00:00",
+    "modelHash": "5d82c7ffa9921b9a5d4fb46bf1cd503611d23a0c81046cd00558c437bfcc5e53",
+    "notes": "Auto-approved test run"
+  }
+}
