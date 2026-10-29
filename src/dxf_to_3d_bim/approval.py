@@ -64,6 +64,11 @@ class ApprovalGate:
         width = round(max_x - min_x, 2)
         depth = round(max_y - min_y, 2)
 
+        levels_list = d.get("levels", [])
+        inhabited = [l for l in levels_list if l.get("storeyType") != "roof_datum"]
+        storeys_count = len(inhabited) if inhabited else (len(levels_list) - 1 if len(levels_list) > 1 else 1)
+        storeys_count = max(1, storeys_count)
+
         return {
             "projectName": d.get("metadata", {}).get("projectName", "Project"),
             "modelHash": compute_model_hash(d),
@@ -80,10 +85,11 @@ class ApprovalGate:
                 "floors": len(floors),
             },
             "proposed_vertical_parameters": {
-                "storeys": len(d.get("levels", [])),
+                "storeys": storeys_count,
                 "wall_height_mm": walls[0].get("height", 3000.0) if walls else 3000.0,
                 "slab_thickness_mm": floors[0].get("thickness", 150.0) if floors else 150.0,
                 "window_sill_height_mm": windows[0].get("sillHeight", 900.0) if windows else 900.0,
+                "levels_breakdown": model.get_levels_summary() if hasattr(model, "get_levels_summary") else [],
             },
             "uncertainties": assumptions,
         }

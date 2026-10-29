@@ -43,12 +43,20 @@ dxf-to-3d-bim inspect path\to\plan.dxf --out-json preflight.json --out-md prefli
 
 ### Guided Interactive One-Command Run
 ```powershell
+# Single-storey floor plan
 dxf-to-3d-bim run path\to\plan.dxf --out deliverables
+
+# Two-storey building with repeated ground floor
+dxf-to-3d-bim run path\to\plan.dxf --storeys 2 --repeat-ground-floor --out deliverables
+
+# Multi-storey with custom storey height or configuration
+dxf-to-3d-bim run path\to\plan.dxf --storeys 3 --storey-height 3200 --repeat-ground-floor --out deliverables
 ```
 
 ### Headless Automated Run (Non-Interactive)
 ```powershell
 dxf-to-3d-bim run path\to\plan.dxf --out deliverables --non-interactive --config approved-config.json
+dxf-to-3d-bim run path\to\plan.dxf --storeys 2 --repeat-ground-floor --auto-approve --out deliverables
 ```
 
 ## Workflow Stages
@@ -71,6 +79,9 @@ flowchart LR
 ### Stage 2: Reconstruct Geometry
 - Classify layers using [`references/dxf-layer-mapping.md`](file:///d:/Agent%20Skills/DXF%20to%203D-BIM/skills/dxf-to-3d-bim/references/dxf-layer-mapping.md).
 - Reconstruct wall centerlines, bridge opening gaps along collinear lines, and host doors/windows within host wall bounds.
+- Support **Multi-Storey Reconstruction**:
+  - **Mode A (DXF Storey Layers)**: Automatically partitions geometry across storeys when layer qualifiers like `L1-WALL`, `L2-WALL`, `FL01-`, or `STOREY_2_` are present.
+  - **Mode B (Configured / Repeated Storeys)**: Reconstructs multi-storey buildings via CLI flags (`--storeys`, `--storey-height`, `--ground-elevation`, `--repeat-ground-floor`, `--storey-config`). Silent replication without explicit approval or configuration is strictly prohibited.
 - Produce intermediate model conforming to [`schemas/bim-model.schema.json`](file:///d:/Agent%20Skills/DXF%20to%203D-BIM/skills/dxf-to-3d-bim/schemas/bim-model.schema.json).
 - Refer to [`workflows/reconstruct-geometry.md`](file:///d:/Agent%20Skills/DXF%20to%203D-BIM/skills/dxf-to-3d-bim/workflows/reconstruct-geometry.md).
 

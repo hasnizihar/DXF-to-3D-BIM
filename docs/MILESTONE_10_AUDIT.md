@@ -150,3 +150,4 @@ flowchart TD
 - [ ] Standard deliverables package produced with `manifest.json` and organized subdirectories.
 - [ ] All 40 existing tests pass + new comprehensive preflight, approval, and pipeline tests.
 - [ ] Documentation (`README.md`, `SKILL.md`) updated and skill mirrored.
+

@@ -19,6 +19,12 @@
         "default_storeys": { "type": "integer", "minimum": 1 },
         "ground_floor_elevation": { "type": "number" },
         "floor_to_floor_height": { "type": "number", "minimum": 1000 },
+        "storey_heights": {
+          "type": "array",
+          "items": { "type": "number", "minimum": 1000 }
+        },
+        "repeat_ground_floor": { "type": "boolean" },
+        "storey_config_path": { "type": "string" },
         "level_names": {
           "type": "array",
           "items": { "type": "string" }
@@ -70,3 +76,4 @@
     }
   }
 }
+

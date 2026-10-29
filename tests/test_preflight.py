@@ -187,3 +187,4 @@ def test_preflight_json_and_markdown_reports(tmp_path):
     assert "## 1. Units & Scale Evaluation" in md_str
     assert "## 3. Semantic Layer Analysis" in md_str
     assert "## 4. Candidate Architectural Features" in md_str
+

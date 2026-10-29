@@ -4,7 +4,7 @@ import copy
 import hashlib
 import json
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 import jsonschema
 from pydantic import BaseModel, Field, ValidationError
 
@@ -29,7 +29,28 @@ class LevelsConfig(BaseModel):
     default_storeys: int = 1
     ground_floor_elevation: float = 0.0
     floor_to_floor_height: float = 3000.0
+    storey_heights: List[float] = Field(default_factory=list)
+    repeat_ground_floor: bool = False
+    storey_config_path: Optional[str] = None
     level_names: List[str] = Field(default_factory=lambda: ["Level 1", "Level 2"])
+
+    def get_storey_elevations(self, storeys_count: Optional[int] = None) -> List[Tuple[str, float, float]]:
+        """Returns list of (level_name, base_elevation, storey_height) for storeys and top roof datum."""
+        count = storeys_count if storeys_count is not None else self.default_storeys
+        count = max(1, count)
+        result = []
+        current_elev = self.ground_floor_elevation
+
+        for i in range(count):
+            name = self.level_names[i] if i < len(self.level_names) else f"Level {i+1}"
+            height = self.storey_heights[i] if i < len(self.storey_heights) else self.floor_to_floor_height
+            result.append((name, current_elev, height))
+            current_elev += height
+
+        # Add roof datum / top ceiling level
+        top_name = self.level_names[count] if count < len(self.level_names) else f"Level {count+1}"
+        result.append((top_name, current_elev, 0.0))
+        return result
 
 
 class WallsConfig(BaseModel):
@@ -169,3 +190,4 @@ class ConfigManager:
                 ConfigManager._deep_merge(base[k], v)
             else:
                 base[k] = v
+

@@ -20,6 +20,7 @@ class BimcraftBuildResult:
     elevation_south_path: Optional[Path] = None
     elevation_east_path: Optional[Path] = None
     section_path: Optional[Path] = None
+    level_plan_paths: Dict[str, Path] = field(default_factory=dict)
     executed_commands: List[Tuple[str, Dict[str, Any]]] = field(default_factory=list)
     raw_output: str = ""
     error_message: Optional[str] = None
@@ -52,6 +53,31 @@ class BimcraftAdapter:
         cmds: List[Tuple[str, Dict[str, Any]]] = []
         d = model.data
 
+        # 0. Level definitions & setup
+        levels = d.get("levels", [])
+        if levels:
+            # Level 1 adjustments (id 100000 in empty project)
+            lvl1 = levels[0]
+            if float(lvl1.get("elevation", 0.0)) != 0.0:
+                cmds.append(("modify", {"id": 100000, "elevation": float(lvl1["elevation"])}))
+            if lvl1.get("name") and lvl1["name"] != "Level 1":
+                cmds.append(("modify", {"id": 100000, "name": str(lvl1["name"])}))
+
+            # Level 2 adjustments (id 100001 in empty project)
+            if len(levels) > 1:
+                lvl2 = levels[1]
+                if float(lvl2.get("elevation", 3000.0)) != 3000.0:
+                    cmds.append(("modify", {"id": 100001, "elevation": float(lvl2["elevation"])}))
+                if lvl2.get("name") and lvl2["name"] != "Level 2":
+                    cmds.append(("modify", {"id": 100001, "name": str(lvl2["name"])}))
+
+            # Additional levels (Level 3+)
+            for lvl in levels[2:]:
+                cmds.append(("level", {
+                    "name": str(lvl.get("name", f"Level_{lvl.get('id')}")),
+                    "elevation": float(lvl.get("elevation", 0.0)),
+                }))
+
         # 1. Walls
         for w in d.get("walls", []):
             wall_params = {
@@ -75,6 +101,7 @@ class BimcraftAdapter:
             if op.get("type") == "door":
                 door_params: Dict[str, Any] = {
                     "at": op["center"],
+                    "level": op.get("levelId", "Level 1"),
                 }
                 cmds.append(("door", door_params))
 
@@ -83,6 +110,7 @@ class BimcraftAdapter:
             if op.get("type") == "window":
                 win_params: Dict[str, Any] = {
                     "at": op["center"],
+                    "level": op.get("levelId", "Level 1"),
                 }
                 if "sillHeight" in op:
                     win_params["sill"] = float(op["sillHeight"])
@@ -101,7 +129,6 @@ class BimcraftAdapter:
 
             # Longitudinal section view through middle of building
             if "section" in views_config:
-                # Calculate middle Y for section line
                 walls = d.get("walls", [])
                 if walls:
                     all_y = [w["start"][1] for w in walls] + [w["end"][1] for w in walls]
@@ -119,6 +146,12 @@ class BimcraftAdapter:
                     "elevation": 30,
                     "path": str(views_config["view_3d"]),
                 }))
+
+            # Upper floor level plans
+            for k, p in views_config.items():
+                if k.startswith("plan_"):
+                    lvl_name = k[len("plan_"):]
+                    cmds.append(("render", {"view": lvl_name, "path": str(p)}))
 
         return cmds
 
@@ -157,11 +190,29 @@ class BimcraftAdapter:
         png_file = p_dir / f"{base_name}.png"
 
         views_config: Dict[str, Path] = {}
+        level_plan_paths: Dict[str, Path] = {}
         if generate_3d_views:
             views_config["view_3d"] = p_dir / f"{base_name}_3d.png"
             views_config["elevation_south"] = p_dir / f"{base_name}_elev_south.png"
             views_config["elevation_east"] = p_dir / f"{base_name}_elev_east.png"
             views_config["section"] = p_dir / f"{base_name}_section_a.png"
+
+            # Multi-level plan views: detect inhabited storeys
+            levels = model.data.get("levels", [])
+            walls = model.data.get("walls", [])
+            floors = model.data.get("floors", [])
+            for i, lvl in enumerate(levels):
+                lname = lvl.get("name", "")
+                lid = lvl.get("id", "")
+                has_elements = any(w.get("levelId") in (lname, lid) for w in walls) or any(fl.get("levelId") in (lname, lid) for fl in floors)
+                if has_elements:
+                    if i == 0:
+                        level_plan_paths[lname] = png_file
+                    else:
+                        slug = lname.lower().replace(" ", "_")
+                        lvl_plan_path = p_dir / f"{base_name}_plan_{slug}.png"
+                        views_config[f"plan_{lname}"] = lvl_plan_path
+                        level_plan_paths[lname] = lvl_plan_path
 
         commands = self.build_commands(model, views_config=views_config if generate_3d_views else None)
 
@@ -200,6 +251,7 @@ class BimcraftAdapter:
             elevation_south_path=views_config.get("elevation_south"),
             elevation_east_path=views_config.get("elevation_east"),
             section_path=views_config.get("section"),
+            level_plan_paths=level_plan_paths,
             executed_commands=commands,
             raw_output=proc.stdout,
         )

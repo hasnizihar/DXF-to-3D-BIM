@@ -135,6 +135,35 @@ class ModelValidator:
                         "details": "Some elements lack formal IfcRelContainedInSpatialStructure association.",
                     })
 
+                # Multi-Storey Element Distribution Check
+                if ifc_sem.contained_by_storey:
+                    inhabited_model_storeys = {}
+                    for w in model.data.get("walls", []):
+                        lvl = w.get("levelId", "Level 1")
+                        inhabited_model_storeys[lvl] = inhabited_model_storeys.get(lvl, 0) + 1
+
+                    multi_storey_failures = []
+                    for lvl_name, expected_elem_count in inhabited_model_storeys.items():
+                        contained_count = len(ifc_sem.contained_by_storey.get(lvl_name, []))
+                        if contained_count == 0:
+                            multi_storey_failures.append(f"Storey '{lvl_name}' expects {expected_elem_count} walls but has 0 contained elements in IFC")
+
+                    if multi_storey_failures:
+                        checks.append({
+                            "category": "Spatial Structure",
+                            "name": "Multi-Storey Element Allocation",
+                            "status": "FAILED",
+                            "details": "; ".join(multi_storey_failures),
+                        })
+                        overall_status = "FAILED"
+                    elif len(inhabited_model_storeys) > 1:
+                        checks.append({
+                            "category": "Spatial Structure",
+                            "name": "Multi-Storey Element Allocation",
+                            "status": "PASSED",
+                            "details": f"Verified elements distributed across {len(inhabited_model_storeys)} inhabited storeys in IFC.",
+                        })
+
             except Exception as e:
                 checks.append({
                     "category": "IFC Verification",
@@ -181,6 +210,31 @@ class ModelValidator:
             "details": f"Expected {expected_windows} windows, found {gen_windows} in IFC",
             "numericalDifference": float(win_diff),
         })
+
+        # Storey Count Check
+        if gen_levels > 0:
+            level_diff = abs(gen_levels - expected_levels)
+            checks.append({
+                "category": "Spatial Structure",
+                "name": "Storey Level Count",
+                "status": "PASSED" if level_diff == 0 else "WARNING",
+                "details": f"Expected {expected_levels} storeys/levels, found {gen_levels} in IFC",
+                "numericalDifference": float(level_diff),
+            })
+
+        # Level Elevation Monotonicity Check
+        levels = model.data.get("levels", [])
+        if len(levels) > 1:
+            elevations = [lvl.get("elevation", 0.0) for lvl in levels]
+            is_monotonic = all(elevations[i] < elevations[i+1] for i in range(len(elevations)-1))
+            checks.append({
+                "category": "Spatial Structure",
+                "name": "Storey Elevation Monotonicity",
+                "status": "PASSED" if is_monotonic else "FAILED",
+                "details": f"Storey elevations are strictly ascending: {elevations}" if is_monotonic else f"Storey elevations are not ascending: {elevations}",
+            })
+            if not is_monotonic:
+                overall_status = "FAILED"
 
         # 5. Deep Geometric Integrity Checks
         geom_checks = self._validate_model_geometry(model)

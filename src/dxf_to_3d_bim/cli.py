@@ -3,7 +3,7 @@
 import json
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Any, Dict, List
 
 import typer
 from rich.console import Console
@@ -98,11 +98,175 @@ def inspect(
         raise typer.Exit(1)
 
 
+def reconstruct_dxf_model(
+    dxf_path: Path | str,
+    parsed: Any,
+    classifier: LayerClassifier,
+    active_unit: str,
+    scale_factor_to_mm: float,
+    storeys: int = 1,
+    storey_height: float = 3000.0,
+    ground_elevation: float = 0.0,
+    repeat_ground_floor: bool = False,
+    storey_config_path: Optional[str] = None,
+    interactive_prompt: bool = True,
+) -> IntermediateBimModel:
+    """Reconstructs IntermediateBimModel from DXF supporting Mode A (layers) and Mode B (configured/repeated)."""
+    if storeys < 1:
+        raise ValueError(f"Storey count must be >= 1 (got {storeys})")
+    if storey_height < 1000:
+        raise ValueError(f"Storey height must be >= 1000 mm (got {storey_height})")
+
+    loaded_storey_config = None
+    if storey_config_path:
+        sc_file = Path(storey_config_path)
+        if not sc_file.exists():
+            raise FileNotFoundError(f"Storey config file not found: {storey_config_path}")
+        with open(sc_file, "r", encoding="utf-8") as f:
+            loaded_storey_config = json.load(f)
+
+    # Check for Mode A: distinct storey layers
+    storey_indices = set()
+    for l in parsed.lines:
+        lvl = classifier.extract_level(l.layer)
+        if lvl is not None:
+            storey_indices.add(lvl)
+
+    is_mode_a = len(storey_indices) > 1
+
+    if is_mode_a:
+        console.print(f"[cyan]Mode A detected: Multi-storey DXF layers found for storeys: {sorted(storey_indices)}[/cyan]")
+        sorted_storeys = sorted(storey_indices)
+        all_walls = []
+        all_openings = []
+        all_floors = []
+        all_rooms = []
+        all_assumptions = []
+
+        curr_elev = ground_elevation
+        for st_idx in sorted_storeys:
+            st_lines = [l for l in parsed.lines if classifier.extract_level(l.layer) == st_idx]
+            st_arcs = [a for a in parsed.arcs if classifier.extract_level(a.layer) == st_idx]
+            st_texts = [t for t in parsed.texts if classifier.extract_level(t.layer) == st_idx]
+
+            wall_rec = WallReconstructor()
+            st_walls = wall_rec.reconstruct(st_lines, classifier=classifier)
+            for w in st_walls:
+                w.id = f"{w.id}_L{st_idx}"
+                w.level_id = f"Level {st_idx}"
+                w.height = storey_height
+                setattr(w, "base_elevation", curr_elev)
+            all_walls.extend(st_walls)
+
+            detector = OpeningDetector()
+            st_openings, st_unhosted = detector.detect_openings(st_lines, st_arcs, st_walls, classifier=classifier)
+            for op in st_openings:
+                op.id = f"{op.id}_L{st_idx}"
+                setattr(op, "level_id", f"Level {st_idx}")
+            all_openings.extend(st_openings)
+
+            spatial = SpatialDetector()
+            st_slab_lines = [l for l in st_lines if classifier.is_slab_layer(l.layer)]
+            st_slab = spatial.detect_slab(st_walls, slab_lines=st_slab_lines)
+            if st_slab:
+                st_slab.id = f"{st_slab.id}_L{st_idx}"
+                st_slab.level_id = f"Level {st_idx}"
+                st_slab.elevation = curr_elev
+                all_floors.append(st_slab)
+
+            st_rooms = spatial.detect_rooms(st_texts, slab=st_slab, classifier=classifier)
+            for rm in st_rooms:
+                rm.id = f"{rm.id}_L{st_idx}"
+                rm.level_id = f"Level {st_idx}"
+            all_rooms.extend(st_rooms)
+
+            curr_elev += storey_height
+
+        storeys_effective = max(len(sorted_storeys), storeys)
+        return IntermediateBimModel.create(
+            project_name=Path(dxf_path).stem,
+            source_dxf_path=str(Path(dxf_path).resolve()),
+            source_units=active_unit,
+            scale_factor=scale_factor_to_mm,
+            walls=all_walls,
+            openings=all_openings,
+            floors=all_floors,
+            rooms=all_rooms,
+            assumptions=all_assumptions,
+            storeys_count=storeys_effective,
+            storey_heights=[storey_height] * storeys_effective,
+            ground_elevation=ground_elevation,
+            repeat_ground_floor=False,
+            storey_config=loaded_storey_config,
+        )
+
+    # Mode B: single-level linework
+    if storeys > 1 and not repeat_ground_floor and not loaded_storey_config:
+        if not interactive_prompt:
+            raise ValueError(
+                f"Multi-storey reconstruction requested ({storeys} storeys) but DXF contains single-storey linework, "
+                f"and neither --repeat-ground-floor nor --storey-config was specified."
+            )
+        else:
+            console.print(f"[yellow]DXF linework is single-storey, but {storeys} storeys were requested.[/yellow]")
+            try:
+                rep_choice = input(f"Replicate ground floor footprint across all {storeys} storeys? [Y/n]: ").strip().lower()
+            except (EOFError, KeyboardInterrupt):
+                raise PermissionError("Generation aborted by user.")
+            if rep_choice not in ("", "y", "yes"):
+                raise PermissionError("Multi-storey generation aborted: unapproved ground floor replication.")
+            repeat_ground_floor = True
+
+    wall_rec = WallReconstructor()
+    walls = wall_rec.reconstruct(parsed.lines, classifier=classifier)
+
+    detector = OpeningDetector()
+    openings, unhosted = detector.detect_openings(parsed.lines, parsed.arcs, walls, classifier=classifier)
+
+    spatial = SpatialDetector()
+    slab_lines = [l for l in parsed.lines if classifier.is_slab_layer(l.layer)]
+    slab = spatial.detect_slab(walls, slab_lines=slab_lines)
+    floors = [slab] if slab else []
+    rooms = spatial.detect_rooms(parsed.texts, slab=slab, classifier=classifier)
+
+    assumptions = []
+    for u in unhosted:
+        assumptions.append({
+            "id": f"unhosted_{u['type']}_{u['source']}",
+            "target": u["type"],
+            "description": f"Unhosted {u['type']} detected near position {u['position']}",
+            "assumedValue": None,
+            "status": "unresolved",
+        })
+
+    return IntermediateBimModel.create(
+        project_name=Path(dxf_path).stem,
+        source_dxf_path=str(Path(dxf_path).resolve()),
+        source_units=active_unit,
+        scale_factor=scale_factor_to_mm,
+        walls=walls,
+        openings=openings,
+        floors=floors,
+        rooms=rooms,
+        assumptions=assumptions,
+        storeys_count=storeys,
+        storey_heights=[storey_height] * storeys,
+        ground_elevation=ground_elevation,
+        repeat_ground_floor=repeat_ground_floor,
+        storey_config=loaded_storey_config,
+    )
+
+
 @app.command()
 def prepare(
     dxf_path: str,
     json_path: Optional[str] = typer.Option(None, "--json", "-j", help="Upstream Sketch-to-CAD JSON file"),
     output_path: str = typer.Option("intermediate-model.json", "--out", "-o", help="Output intermediate model path"),
+    storeys: int = typer.Option(1, "--storeys", "-s", help="Number of storeys to reconstruct (>= 1)"),
+    storey_height: float = typer.Option(3000.0, "--storey-height", help="Floor-to-floor height in mm (default 3000.0)"),
+    ground_elevation: float = typer.Option(0.0, "--ground-elevation", help="Ground floor elevation in mm (default 0.0)"),
+    repeat_ground_floor: bool = typer.Option(False, "--repeat-ground-floor", help="Replicate ground floor footprint across upper storeys"),
+    storey_config: Optional[str] = typer.Option(None, "--storey-config", help="Path to JSON file with custom storey definitions"),
 ):
     """Parses DXF, reconstructs geometry, and creates an intermediate model awaiting approval."""
     if json_path and Path(json_path).exists():
@@ -111,42 +275,20 @@ def prepare(
     else:
         parser = DxfParser()
         parsed = parser.parse(dxf_path)
-
         classifier = LayerClassifier()
-        wall_rec = WallReconstructor()
-        walls = wall_rec.reconstruct(parsed.lines, classifier=classifier)
 
-        detector = OpeningDetector()
-        openings, unhosted = detector.detect_openings(parsed.lines, parsed.arcs, walls, classifier=classifier)
-
-        spatial = SpatialDetector()
-        slab_lines = [l for l in parsed.lines if classifier.is_slab_layer(l.layer)]
-        slab = spatial.detect_slab(walls, slab_lines=slab_lines)
-        floors = [slab] if slab else []
-
-        rooms = spatial.detect_rooms(parsed.texts, slab=slab, classifier=classifier)
-
-        assumptions = []
-        for u in unhosted:
-            assumptions.append({
-                "id": f"unhosted_{u['type']}_{u['source']}",
-                "target": u["type"],
-                "description": f"Unhosted {u['type']} detected near position {u['position']}",
-                "assumedValue": None,
-                "status": "unresolved",
-            })
-
-        project_name = Path(dxf_path).stem
-        model = IntermediateBimModel.create(
-            project_name=project_name,
-            source_dxf_path=dxf_path,
-            source_units=parsed.report.detected_units,
-            scale_factor=parsed.report.scale_factor_to_mm,
-            walls=walls,
-            openings=openings,
-            floors=floors,
-            rooms=rooms,
-            assumptions=assumptions,
+        model = reconstruct_dxf_model(
+            dxf_path=dxf_path,
+            parsed=parsed,
+            classifier=classifier,
+            active_unit=parsed.report.detected_units,
+            scale_factor_to_mm=parsed.report.scale_factor_to_mm,
+            storeys=storeys,
+            storey_height=storey_height,
+            ground_elevation=ground_elevation,
+            repeat_ground_floor=repeat_ground_floor,
+            storey_config_path=storey_config,
+            interactive_prompt=True,
         )
 
     saved_path = model.save(output_path)
@@ -259,6 +401,11 @@ def run(
     out_dir: str = typer.Option("output", "--out", "-o", help="Structured deliverables output directory"),
     config: Optional[str] = typer.Option(None, "--config", "-c", help="Path to project configuration JSON"),
     unit: Optional[str] = typer.Option(None, "--unit", "-u", help="Explicit unit override (mm, m, ft, in)"),
+    storeys: int = typer.Option(1, "--storeys", "-s", help="Number of storeys to reconstruct (>= 1)"),
+    storey_height: float = typer.Option(3000.0, "--storey-height", help="Floor-to-floor height in mm (default 3000.0)"),
+    ground_elevation: float = typer.Option(0.0, "--ground-elevation", help="Ground floor elevation in mm (default 0.0)"),
+    repeat_ground_floor: bool = typer.Option(False, "--repeat-ground-floor", help="Replicate ground floor footprint across upper storeys"),
+    storey_config: Optional[str] = typer.Option(None, "--storey-config", help="Path to JSON file with custom storey definitions"),
     non_interactive: bool = typer.Option(False, "--non-interactive", help="Run without terminal prompts (requires config or auto-approve)"),
     auto_approve: bool = typer.Option(False, "--auto-approve", help="Simulate human approval for automated headless testing"),
     views: bool = typer.Option(True, "--views/--no-views", help="Generate 3D isometric, elevation, and section views"),
@@ -346,41 +493,40 @@ def run(
     active_unit = cfg.units.source_unit or preflight.detected_units
     parser = DxfParser(fallback_units=active_unit)
     parsed = parser.parse(input_path, unit_override=active_unit)
-
     classifier = LayerClassifier()
-    wall_rec = WallReconstructor()
-    walls = wall_rec.reconstruct(parsed.lines, classifier=classifier)
 
-    detector = OpeningDetector()
-    openings, unhosted = detector.detect_openings(parsed.lines, parsed.arcs, walls, classifier=classifier)
+    # Determine effective storey parameters
+    eff_storey_height = storey_height
+    if cfg.levels.floor_to_floor_height != 3000.0 and storey_height == 3000.0:
+        eff_storey_height = cfg.levels.floor_to_floor_height
 
-    spatial = SpatialDetector()
-    slab_lines = [l for l in parsed.lines if classifier.is_slab_layer(l.layer)]
-    slab = spatial.detect_slab(walls, slab_lines=slab_lines)
-    floors = [slab] if slab else []
-    rooms = spatial.detect_rooms(parsed.texts, slab=slab, classifier=classifier)
+    eff_storeys = storeys
+    if cfg.levels.default_storeys > 1 and storeys == 1:
+        eff_storeys = cfg.levels.default_storeys
 
-    assumptions = []
-    for u in unhosted:
-        assumptions.append({
-            "id": f"unhosted_{u['type']}_{u['source']}",
-            "target": u["type"],
-            "description": f"Unhosted {u['type']} detected near position {u['position']}",
-            "assumedValue": None,
-            "status": "unresolved",
-        })
+    eff_repeat = repeat_ground_floor or cfg.levels.repeat_ground_floor
+    eff_config_path = storey_config or cfg.levels.storey_config_path
 
-    model = IntermediateBimModel.create(
-        project_name=input_path.stem,
-        source_dxf_path=str(input_path.resolve()),
-        source_units=active_unit,
-        scale_factor=preflight.scale_factor_to_mm,
-        walls=walls,
-        openings=openings,
-        floors=floors,
-        rooms=rooms,
-        assumptions=assumptions,
-    )
+    try:
+        model = reconstruct_dxf_model(
+            dxf_path=input_path,
+            parsed=parsed,
+            classifier=classifier,
+            active_unit=active_unit,
+            scale_factor_to_mm=preflight.scale_factor_to_mm,
+            storeys=eff_storeys,
+            storey_height=eff_storey_height,
+            ground_elevation=ground_elevation,
+            repeat_ground_floor=eff_repeat,
+            storey_config_path=eff_config_path,
+            interactive_prompt=not non_interactive and not auto_approve,
+        )
+    except Exception as e:
+        console.print(f"[bold red]Reconstruction error:[/bold red] {e}")
+        manifest.run_status = "FAILED"
+        manifest.errors.append(str(e))
+        manifest.save(out_base / "manifest.json")
+        raise typer.Exit(1)
     inter_model_path = analysis_dir / "intermediate-model.json"
     model.save(inter_model_path)
     manifest.add_artifact("analysis", "intermediate_model", inter_model_path, base_dir=out_base)
@@ -457,6 +603,11 @@ def run(
         manifest.add_artifact("previews", "elevation_east", build_res.elevation_east_path, base_dir=out_base)
     if build_res.section_path:
         manifest.add_artifact("previews", "section_a", build_res.section_path, base_dir=out_base)
+    if build_res.level_plan_paths:
+        for lvl_name, lpath in build_res.level_plan_paths.items():
+            if lpath.exists() and lpath != build_res.png_path:
+                slug = lvl_name.lower().replace(" ", "_")
+                manifest.add_artifact("previews", f"plan_{slug}", lpath, base_dir=out_base)
 
     # 6. Deep Validation Stage
     console.print("[cyan]Performing Independent IFC & Topological Validation...[/cyan]")
@@ -515,6 +666,10 @@ def run(
     summary_table.add_row("Previews", "2D Plan Preview", f"previews/{build_res.png_path.name}")
     if build_res.view_3d_path:
         summary_table.add_row("Previews", "3D Axonometric Render", f"previews/{build_res.view_3d_path.name}")
+    if build_res.level_plan_paths:
+        for lvl_name, lpath in build_res.level_plan_paths.items():
+            if lpath.exists() and lpath != build_res.png_path:
+                summary_table.add_row("Previews", f"{lvl_name} Plan Preview", f"previews/{lpath.name}")
     if comp_report and comp_report.overlay_image_path:
         summary_table.add_row("Previews", "CAD/BIM Comparison Overlay", f"previews/{overlay_file.name}")
     summary_table.add_row("Reports", "Independent Validation Report", "reports/validation-report.json")

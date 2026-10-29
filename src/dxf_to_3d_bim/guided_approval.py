@@ -89,11 +89,23 @@ class GuidedApprovalSession:
 
         # Section 5: Storeys & Elevation
         t5 = Table(title="Section 5: Storeys & Datums")
-        t5.add_column("Property", style="cyan")
-        t5.add_column("Value", style="green")
-        t5.add_row("Supported Storeys", f"{vert['storeys']} Storey")
-        t5.add_row("Base Level (Level 1)", "0.0 mm (Ground)")
-        t5.add_row("Ceiling Level (Level 2)", f"{vert['wall_height_mm']} mm")
+        t5.add_column("Level / Storey", style="cyan")
+        t5.add_column("Base Elevation (mm)", style="green")
+        t5.add_column("Height (mm)", style="green")
+        t5.add_column("Walls / Slabs", style="white")
+
+        breakdown = vert.get("levels_breakdown", [])
+        if breakdown:
+            for b in breakdown:
+                t5.add_row(
+                    f"{b['name']} ({b.get('storeyType', 'standard')})",
+                    f"{b['elevation']:.1f}",
+                    f"{b['height']:.1f}",
+                    f"{b['walls']} walls, {b['floors']} slabs",
+                )
+        else:
+            t5.add_row("Level 1 (Ground)", "0.0", f"{vert['wall_height_mm']:.1f}", "Ground Floor")
+            t5.add_row("Level 2 (Ceiling/Roof Datum)", f"{vert['wall_height_mm']:.1f}", "0.0", "Roof Datum")
         self.console.print(t5)
 
         # Section 6: Warnings & Uncertainties

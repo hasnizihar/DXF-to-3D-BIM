@@ -29,13 +29,19 @@ class IntermediateBimModel:
         rooms: List[Any],
         assumptions: Optional[List[Dict[str, Any]]] = None,
         source_json_path: Optional[str] = None,
+        storeys_count: int = 1,
+        storey_heights: Optional[List[float]] = None,
+        ground_elevation: float = 0.0,
+        repeat_ground_floor: bool = False,
+        storey_config: Optional[Dict[str, Any]] = None,
+        levels_override: Optional[List[Dict[str, Any]]] = None,
     ) -> "IntermediateBimModel":
         now_iso = datetime.now(timezone.utc).isoformat()
 
         # Build walls dicts
         wall_dicts = []
         for w in walls:
-            wall_dicts.append({
+            item = {
                 "id": w.id,
                 "classification": w.classification,
                 "start": [w.start[0], w.start[1]],
@@ -45,25 +51,29 @@ class IntermediateBimModel:
                 "levelId": getattr(w, "level_id", "Level 1"),
                 "confidence": getattr(w, "confidence", "high"),
                 "sourceEntities": getattr(w, "source_entities", []),
-            })
+            }
+            if hasattr(w, "base_elevation") and w.base_elevation is not None:
+                item["baseElevation"] = float(w.base_elevation)
+            wall_dicts.append(item)
 
         # Build openings dicts
         opening_dicts = []
         for op in openings:
-            item: Dict[str, Any] = {
+            item_op: Dict[str, Any] = {
                 "id": op.id,
                 "type": op.type,
                 "wallId": op.wall_id,
                 "center": [op.center[0], op.center[1]],
                 "width": op.width,
                 "height": op.height,
+                "levelId": getattr(op, "level_id", getattr(op, "levelId", "Level 1")),
                 "confidence": getattr(op, "confidence", "high"),
             }
             if op.sill_height is not None:
-                item["sillHeight"] = op.sill_height
+                item_op["sillHeight"] = op.sill_height
             if getattr(op, "swing", None):
-                item["swing"] = op.swing
-            opening_dicts.append(item)
+                item_op["swing"] = op.swing
+            opening_dicts.append(item_op)
 
         # Build floor dicts
         floor_dicts = []
@@ -87,10 +97,141 @@ class IntermediateBimModel:
                 "labelPosition": [rm.label_position[0], rm.label_position[1]],
             })
 
-        levels = [
-            {"id": "level_1", "name": "Level 1", "elevation": 0.0, "height": 3000.0},
-            {"id": "level_2", "name": "Level 2", "elevation": 3000.0, "height": 3000.0},
-        ]
+        # Configure levels and multi-storey replication
+        if levels_override:
+            levels = levels_override
+        elif storey_config and "storeys" in storey_config:
+            levels = []
+            curr_elev = ground_elevation
+            cfg_storeys = storey_config["storeys"]
+            for st in cfg_storeys:
+                st_idx = st.get("index", len(levels) + 1)
+                st_name = st.get("name", f"Level {st_idx}")
+                st_height = float(st.get("height", 3000.0))
+                st_elev = float(st.get("elevation", curr_elev))
+                levels.append({
+                    "id": f"level_{st_idx}",
+                    "name": st_name,
+                    "elevation": st_elev,
+                    "height": st_height,
+                    "index": st_idx,
+                    "storeyType": "ground" if st_idx == 1 else "upper",
+                    "provenance": "user_configured_custom",
+                })
+                curr_elev = st_elev + st_height
+            # Top datum
+            top_idx = len(levels) + 1
+            levels.append({
+                "id": f"level_{top_idx}",
+                "name": f"Level {top_idx}",
+                "elevation": curr_elev,
+                "height": 0.0,
+                "index": top_idx,
+                "storeyType": "roof_datum",
+                "provenance": "default",
+            })
+        elif storeys_count > 1:
+            levels = []
+            curr_elev = ground_elevation
+            heights = storey_heights or [3000.0] * storeys_count
+            while len(heights) < storeys_count:
+                heights.append(3000.0)
+
+            for i in range(storeys_count):
+                st_idx = i + 1
+                st_name = f"Level {st_idx}"
+                st_height = float(heights[i])
+                levels.append({
+                    "id": f"level_{st_idx}",
+                    "name": st_name,
+                    "elevation": curr_elev,
+                    "height": st_height,
+                    "index": st_idx,
+                    "storeyType": "ground" if st_idx == 1 else "upper",
+                    "provenance": "user_configured_repeated" if repeat_ground_floor else "default",
+                })
+                curr_elev += st_height
+
+            # Top datum
+            top_idx = storeys_count + 1
+            levels.append({
+                "id": f"level_{top_idx}",
+                "name": f"Level {top_idx}",
+                "elevation": curr_elev,
+                "height": 0.0,
+                "index": top_idx,
+                "storeyType": "roof_datum",
+                "provenance": "default",
+            })
+        else:
+            # Baseline single-storey default (backward compatible)
+            h0 = wall_dicts[0].get("height", 3000.0) if wall_dicts else 3000.0
+            levels = [
+                {"id": "level_1", "name": "Level 1", "elevation": ground_elevation, "height": h0},
+                {"id": "level_2", "name": "Level 2", "elevation": ground_elevation + h0, "height": h0},
+            ]
+
+        # Multi-storey replication of ground floor geometry if requested
+        if (repeat_ground_floor or (storey_config and any(s.get("repeat_footprint") for s in storey_config.get("storeys", [])))) and (storeys_count > 1 or (storey_config and len(storey_config.get("storeys", [])) > 1)):
+            target_storeys = storeys_count if storeys_count > 1 else len(storey_config["storeys"])
+            # Isolate ground floor elements
+            base_walls = [w for w in wall_dicts if w.get("levelId") in ("Level 1", "level_1")]
+            base_openings = [op for op in opening_dicts if op.get("levelId") in ("Level 1", "level_1") or not op.get("levelId")]
+            base_floors = [fl for fl in floor_dicts if fl.get("levelId") in ("Level 1", "level_1")]
+
+            # Ensure ground elements have explicit baseElevation 0.0
+            for w in base_walls:
+                if "baseElevation" not in w:
+                    w["baseElevation"] = ground_elevation
+
+            for i in range(2, target_storeys + 1):
+                level_meta = next((l for l in levels if l.get("name") == f"Level {i}"), None)
+                storey_elev = level_meta["elevation"] if level_meta else (ground_elevation + (i - 1) * 3000.0)
+                storey_height = level_meta["height"] if level_meta else 3000.0
+
+                # Replicate walls
+                for w in base_walls:
+                    rep_w_id = f"{w['id']}_L{i}"
+                    wall_dicts.append({
+                        "id": rep_w_id,
+                        "classification": w["classification"],
+                        "start": list(w["start"]),
+                        "end": list(w["end"]),
+                        "thickness": w["thickness"],
+                        "height": storey_height,
+                        "levelId": f"Level {i}",
+                        "baseElevation": storey_elev,
+                        "confidence": w.get("confidence", "high"),
+                        "sourceEntities": [f"{s}_L{i}" for s in w.get("sourceEntities", [])],
+                    })
+
+                # Replicate openings
+                for op in base_openings:
+                    rep_op = {
+                        "id": f"{op['id']}_L{i}",
+                        "type": op["type"],
+                        "wallId": f"{op['wallId']}_L{i}",
+                        "center": list(op["center"]),
+                        "width": op["width"],
+                        "height": op["height"],
+                        "levelId": f"Level {i}",
+                        "confidence": op.get("confidence", "high"),
+                    }
+                    if "sillHeight" in op:
+                        rep_op["sillHeight"] = op["sillHeight"]
+                    if "swing" in op:
+                        rep_op["swing"] = op["swing"]
+                    opening_dicts.append(rep_op)
+
+                # Replicate floor slab for upper level
+                for fl in base_floors:
+                    floor_dicts.append({
+                        "id": f"{fl['id']}_L{i}",
+                        "levelId": f"Level {i}",
+                        "thickness": fl.get("thickness", 150.0),
+                        "elevation": storey_elev,
+                        "boundary": [list(pt) for pt in fl.get("boundary", [])],
+                    })
 
         model_dict: Dict[str, Any] = {
             "schemaVersion": "1.0.0",
@@ -248,4 +389,29 @@ class IntermediateBimModel:
         instance = cls(data)
         instance.validate_schema()
         return instance
+
+    def get_levels_summary(self) -> List[Dict[str, Any]]:
+        """Returns structured breakdown of levels with counts of walls, openings, and slabs."""
+        summary = []
+        walls = self.data.get("walls", [])
+        openings = self.data.get("openings", [])
+        floors = self.data.get("floors", [])
+
+        for lvl in self.data.get("levels", []):
+            lname = lvl.get("name")
+            lid = lvl.get("id")
+            lvl_walls = [w for w in walls if w.get("levelId") in (lname, lid)]
+            lvl_ops = [op for op in openings if op.get("levelId") in (lname, lid)]
+            lvl_fls = [fl for fl in floors if fl.get("levelId") in (lname, lid)]
+            summary.append({
+                "id": lid,
+                "name": lname,
+                "elevation": lvl.get("elevation", 0.0),
+                "height": lvl.get("height", 0.0),
+                "storeyType": lvl.get("storeyType", "standard"),
+                "walls": len(lvl_walls),
+                "openings": len(lvl_ops),
+                "floors": len(lvl_fls),
+            })
+        return summary
 

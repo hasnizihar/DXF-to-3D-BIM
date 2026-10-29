@@ -142,6 +142,7 @@ class IfcSemanticInspection:
     voids_verified: bool
     fills_verified: bool
     containment_verified: bool
+    contained_by_storey: Dict[str, List[int]] = field(default_factory=dict)
     details: List[str] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
 
@@ -263,6 +264,10 @@ class PureIfcParser:
             missing = all_primary_ids - contained_element_ids
             details.append(f"Containment warning: elements {missing} not bound to a storey.")
 
+        contained_by_storey_named: Dict[str, List[int]] = {}
+        for st in storeys:
+            contained_by_storey_named[st["name"]] = contained_by_storey.get(st["id"], [])
+
         # 3. Opening and Wall Penetration (Voiding & Filling) Check
         void_rels = self.get_entities_by_type("IFCRELVOIDSELEMENT")
         wall_to_openings: Dict[int, List[int]] = {}
@@ -361,6 +366,7 @@ class PureIfcParser:
             voids_verified=voids_verified,
             fills_verified=fills_verified,
             containment_verified=containment_verified,
+            contained_by_storey=contained_by_storey_named,
             details=details,
             warnings=self.warnings,
         )

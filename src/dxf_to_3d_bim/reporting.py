@@ -78,6 +78,16 @@ class ReviewSummaryGenerator:
         md.append(f"| **Floor Slabs** | {len(floors)} | {len(floors)} | PASSED |")
         md.append("")
 
+        # Storey Breakdown table if multi-storey or levels exist
+        levels_summary = model.get_levels_summary() if hasattr(model, "get_levels_summary") else []
+        if levels_summary:
+            md.append("### Storey & Level Spatial Structure")
+            md.append("| Level Name | Base Elevation (mm) | Height (mm) | Storey Type | Walls | Slabs |")
+            md.append("| :--- | :--- | :--- | :--- | :--- | :--- |")
+            for lvl in levels_summary:
+                md.append(f"| **{lvl['name']}** | {lvl['elevation']:.1f} | {lvl['height']:.1f} | {lvl.get('storeyType', 'standard')} | {lvl['walls']} | {lvl['floors']} |")
+            md.append("")
+
         md.append("---")
         md.append("## 3. Geometric & Semantic Validation Checks")
         for check in validation_report.get("checks", []):
@@ -103,7 +113,11 @@ class ReviewSummaryGenerator:
             if build_result.view_3d_path and build_result.view_3d_path.exists():
                 md.append(f"* **3D Axonometric Render:** `{build_result.view_3d_path.name}` ({build_result.view_3d_path.stat().st_size} bytes)")
             if build_result.png_path and build_result.png_path.exists():
-                md.append(f"* **2D Plan View:** `{build_result.png_path.name}` ({build_result.png_path.stat().st_size} bytes)")
+                md.append(f"* **2D Plan View (Ground):** `{build_result.png_path.name}` ({build_result.png_path.stat().st_size} bytes)")
+            if build_result.level_plan_paths:
+                for lvl_name, lpath in build_result.level_plan_paths.items():
+                    if lpath.exists() and lpath != build_result.png_path:
+                        md.append(f"* **2D Plan View ({lvl_name}):** `{lpath.name}` ({lpath.stat().st_size} bytes)")
             if build_result.elevation_south_path and build_result.elevation_south_path.exists():
                 md.append(f"* **South Elevation:** `{build_result.elevation_south_path.name}` ({build_result.elevation_south_path.stat().st_size} bytes)")
             if build_result.elevation_east_path and build_result.elevation_east_path.exists():

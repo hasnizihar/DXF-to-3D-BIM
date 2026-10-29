@@ -61,7 +61,11 @@
           "id": { "type": "string" },
           "name": { "type": "string" },
           "elevation": { "type": "number" },
-          "height": { "type": "number", "minimum": 0 }
+          "height": { "type": "number", "minimum": 0 },
+          "index": { "type": "integer", "minimum": 1 },
+          "floorToFloorHeight": { "type": "number", "minimum": 0 },
+          "storeyType": { "type": "string", "enum": ["ground", "upper", "roof_datum"] },
+          "provenance": { "type": "string", "enum": ["explicit_dxf", "user_configured_repeated", "user_configured_custom", "default"] }
         }
       }
     },
@@ -88,6 +92,7 @@
           "thickness": { "type": "number", "minimum": 0 },
           "height": { "type": "number", "minimum": 0 },
           "levelId": { "type": "string" },
+          "baseElevation": { "type": "number" },
           "material": { "type": "string" },
           "confidence": { "type": "string", "enum": ["high", "medium", "low"] },
           "sourceEntities": {
@@ -115,6 +120,7 @@
           "width": { "type": "number", "minimum": 0 },
           "height": { "type": "number", "minimum": 0 },
           "sillHeight": { "type": "number" },
+          "levelId": { "type": "string" },
           "swing": { "type": "string" },
           "confidence": { "type": "string", "enum": ["high", "medium", "low"] }
         }
