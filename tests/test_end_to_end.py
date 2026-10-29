@@ -110,3 +110,4 @@ def test_end_to_end_acceptance_workflow(tmp_path):
     assert val_report["elementSummary"]["generated"]["doors"] == 1
     assert val_report["elementSummary"]["generated"]["windows"] == 1
     assert val_report["elementSummary"]["generated"]["levels"] >= 2
+

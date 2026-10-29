@@ -141,3 +141,4 @@ class ApprovalGate:
             return False, f"Model status is '{model.data.get('status')}', must be 'approved'."
 
         return True, "Approval is valid."
+

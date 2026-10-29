@@ -45,3 +45,4 @@ def snap_point(pt: Tuple[float, float], reference_points: List[Tuple[float, floa
         if distance_point_to_point(pt, ref) <= tolerance:
             return ref
     return pt
+

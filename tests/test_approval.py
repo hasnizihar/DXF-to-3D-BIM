@@ -35,3 +35,4 @@ def test_tamper_invalidates_approval():
     valid, reason = ApprovalGate.verify_approval(model)
     assert not valid
     assert "changed since approval" in reason
+

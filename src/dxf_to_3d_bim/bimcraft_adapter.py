@@ -159,3 +159,4 @@ class BimcraftAdapter:
             check=True,
         )
         return json.loads(proc.stdout)
+

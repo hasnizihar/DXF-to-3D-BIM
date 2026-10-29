@@ -72,3 +72,4 @@ def test_sketch_to_cad_json_import(tmp_path):
     assert model.data["walls"][0]["thickness"] == 200.0
     assert model.data["openings"][0]["center"] == [3000.0, 0.0]
     assert model.data["openings"][0]["width"] == 900.0
+

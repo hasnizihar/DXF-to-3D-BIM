@@ -22,3 +22,4 @@ def test_validator_detects_missing_files(tmp_path):
     report = validator.validate(model, dummy_result)
     assert report["overallStatus"] == "FAILED"
     assert any("not found on disk" in c["details"] for c in report["checks"])
+

@@ -27,3 +27,4 @@ def test_single_line_wall():
     assert len(walls) == 1
     assert walls[0].classification == "interior"
     assert walls[0].thickness == 100.0  # Default interior thickness
+

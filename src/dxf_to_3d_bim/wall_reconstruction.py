@@ -221,3 +221,4 @@ class WallReconstructor:
             w.end = snap_point(w.end, clustered_nodes, self.endpoint_snap_tolerance)
 
         return walls
+

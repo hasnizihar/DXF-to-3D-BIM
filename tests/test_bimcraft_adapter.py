@@ -47,3 +47,4 @@ def test_approval_enforced_before_build(tmp_path):
     # Must raise PermissionError if model is unapproved
     with pytest.raises(PermissionError):
         adapter.execute_build(model, output_dir=tmp_path)
+

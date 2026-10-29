@@ -248,3 +248,4 @@ class IntermediateBimModel:
         instance = cls(data)
         instance.validate_schema()
         return instance
+

@@ -21,3 +21,4 @@ def test_layer_classifier_regex_fallbacks():
     assert lc.classify("INT_PARTITION_WALL") == "interior_wall"
     assert lc.classify("WINDOW_GLAZING") == "window"
     assert lc.classify("DOORS_FIRST_FLOOR") == "door"
+

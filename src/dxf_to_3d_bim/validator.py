@@ -1,4 +1,4 @@
-"""Independent model validator conforming to validation-report.schema.json."""
+"""Independent model validator conforming to validation-report.schema.json with deep IFC semantic checks."""
 
 import json
 from datetime import datetime, timezone
@@ -7,6 +7,7 @@ from typing import Dict, Any, List, Optional
 import jsonschema
 
 from dxf_to_3d_bim.bimcraft_adapter import BimcraftAdapter, BimcraftBuildResult
+from dxf_to_3d_bim.ifc_parser import PureIfcParser
 from dxf_to_3d_bim.intermediate_model import IntermediateBimModel
 
 VALIDATION_SCHEMA_PATH = (
@@ -33,7 +34,7 @@ class ModelValidator:
         checks: List[Dict[str, Any]] = []
         overall_status = "PASSED"
 
-        # 1. Deliverables existence and size checks
+        # 1. Deliverables existence and non-zero size checks
         for label, file_path in [
             ("Native BIMCraft Project", build_result.bimcraft_path),
             ("IFC4 Export", build_result.ifc_path),
@@ -85,17 +86,54 @@ class ModelValidator:
                 })
                 overall_status = "FAILED"
 
-        # 3. Inspect IFC structure and counts
-        ifc_info = {}
+        # 3. Deep Independent IFC4 Parsing & Verification
+        actual_counts: Dict[str, int] = {}
         if build_result.ifc_path and build_result.ifc_path.exists():
             try:
-                ifc_info = self.adapter.inspect_file(build_result.ifc_path)
+                ifc_parser = PureIfcParser(build_result.ifc_path)
+                ifc_sem = ifc_parser.inspect()
+                actual_counts = ifc_sem.counts
+
                 checks.append({
                     "category": "IFC Verification",
                     "name": "Parse IFC Model",
                     "status": "PASSED",
-                    "details": f"IFC4 parsed successfully. Units: {ifc_info.get('units', 'unknown')}",
+                    "details": f"IFC4 parsed successfully (schema: {ifc_sem.schema})",
                 })
+
+                # Opening Void & Wall Penetration Check
+                if ifc_sem.voids_verified and ifc_sem.fills_verified:
+                    checks.append({
+                        "category": "Geometric Topology",
+                        "name": "Wall Voiding and Opening Penetration",
+                        "status": "PASSED",
+                        "details": "All doors and windows are verified to create IfcOpeningElement voids that cut their host IfcWalls via IfcRelVoidsElement and IfcRelFillsElement.",
+                    })
+                else:
+                    checks.append({
+                        "category": "Geometric Topology",
+                        "name": "Wall Voiding and Opening Penetration",
+                        "status": "FAILED",
+                        "details": "One or more openings do not properly void their host walls in IFC.",
+                    })
+                    overall_status = "FAILED"
+
+                # Spatial Storey Containment Check
+                if ifc_sem.containment_verified:
+                    checks.append({
+                        "category": "Spatial Structure",
+                        "name": "Storey Containment",
+                        "status": "PASSED",
+                        "details": "All architectural elements are formally assigned to building storeys via IfcRelContainedInSpatialStructure.",
+                    })
+                else:
+                    checks.append({
+                        "category": "Spatial Structure",
+                        "name": "Storey Containment",
+                        "status": "WARNING",
+                        "details": "Some elements lack formal IfcRelContainedInSpatialStructure association.",
+                    })
+
             except Exception as e:
                 checks.append({
                     "category": "IFC Verification",
@@ -111,11 +149,10 @@ class ModelValidator:
         expected_windows = len([op for op in model.data.get("openings", []) if op.get("type") == "window"])
         expected_levels = len(model.data.get("levels", []))
 
-        actual_counts = ifc_info.get("counts", {})
         gen_walls = actual_counts.get("wall", 0)
         gen_doors = actual_counts.get("door", 0)
         gen_windows = actual_counts.get("window", 0)
-        gen_levels = actual_counts.get("level", 0)
+        gen_levels = actual_counts.get("storey", 0)
 
         # Walls check
         wall_diff = abs(gen_walls - expected_walls)

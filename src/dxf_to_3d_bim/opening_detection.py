@@ -168,3 +168,4 @@ class OpeningDetector:
                 best_offset = offset
 
         return best_wall, best_proj, best_offset, best_dist
+

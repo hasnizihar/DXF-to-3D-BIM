@@ -258,3 +258,4 @@ class DxfParser:
                             )
 
         return ParsedDxfData(report=report, lines=lines, arcs=arcs, texts=texts)
+

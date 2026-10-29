@@ -58,3 +58,4 @@ def test_window_line_hosting():
     assert op.wall_id == "wall_2"
     assert op.width == 1200.0
     assert op.sill_height == 900.0
+

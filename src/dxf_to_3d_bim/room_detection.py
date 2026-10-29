@@ -126,3 +126,4 @@ class SpatialDetector:
             counter += 1
 
         return rooms
+

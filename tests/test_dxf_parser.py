@@ -32,3 +32,4 @@ def test_parse_entities(sample_dxf):
     assert len(data.arcs) >= 1
     assert len(data.texts) >= 1
     assert data.texts[0].text == "Living Room"
+

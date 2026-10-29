@@ -54,3 +54,4 @@ if __name__ == "__main__":
     out = Path(__file__).parent / "fixtures" / "simple_room.dxf"
     create_synthetic_room_dxf(out)
     print(f"Created synthetic fixture at: {out}")
+
