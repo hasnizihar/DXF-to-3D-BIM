@@ -71,3 +71,4 @@ def test_dxf_with_block_insert_expansion(tmp_path):
     assert l.start == (1000.0, 2000.0)
     assert l.end == (5000.0, 2000.0)
     assert l.source_type == "INSERT/LINE"
+

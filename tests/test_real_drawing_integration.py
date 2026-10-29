@@ -74,3 +74,4 @@ def test_direct_dxf_inspection_and_reconstruction():
     detector = OpeningDetector()
     openings, unhosted = detector.detect_openings(parsed.lines, parsed.arcs, walls, classifier=classifier)
     assert len(openings) >= 10
+
