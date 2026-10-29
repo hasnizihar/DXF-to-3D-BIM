@@ -1,4 +1,4 @@
-"""BIMCraft 0.9.0 adapter for executing verified CLI commands."""
+"""BIMCraft 0.9.0 adapter for executing verified CLI commands and rendering 2D/3D views."""
 
 import json
 import subprocess
@@ -16,6 +16,10 @@ class BimcraftBuildResult:
     bimcraft_path: Optional[Path] = None
     ifc_path: Optional[Path] = None
     png_path: Optional[Path] = None
+    view_3d_path: Optional[Path] = None
+    elevation_south_path: Optional[Path] = None
+    elevation_east_path: Optional[Path] = None
+    section_path: Optional[Path] = None
     executed_commands: List[Tuple[str, Dict[str, Any]]] = field(default_factory=list)
     raw_output: str = ""
     error_message: Optional[str] = None
@@ -39,13 +43,16 @@ class BimcraftAdapter:
     def is_available(self) -> bool:
         return self.cli_path.exists()
 
-    def build_commands(self, model: IntermediateBimModel) -> List[Tuple[str, Dict[str, Any]]]:
+    def build_commands(
+        self,
+        model: IntermediateBimModel,
+        views_config: Optional[Dict[str, Path]] = None,
+    ) -> List[Tuple[str, Dict[str, Any]]]:
         """Translates approved intermediate model into a sequenced list of BIMCraft commands."""
         cmds: List[Tuple[str, Dict[str, Any]]] = []
         d = model.data
 
-        # 1. Levels (BIMCraft defaults to Level 1 (0) and Level 2 (3000), but we configure if custom)
-        # 2. Walls
+        # 1. Walls
         for w in d.get("walls", []):
             wall_params = {
                 "points": [w["start"], w["end"]],
@@ -55,7 +62,7 @@ class BimcraftAdapter:
             }
             cmds.append(("wall", wall_params))
 
-        # 3. Floors / Slabs
+        # 2. Floors / Slabs
         for fl in d.get("floors", []):
             floor_params = {
                 "boundary": fl["boundary"],
@@ -63,7 +70,7 @@ class BimcraftAdapter:
             }
             cmds.append(("floor", floor_params))
 
-        # 4. Doors (hosted)
+        # 3. Doors (hosted)
         for op in d.get("openings", []):
             if op.get("type") == "door":
                 door_params: Dict[str, Any] = {
@@ -71,7 +78,7 @@ class BimcraftAdapter:
                 }
                 cmds.append(("door", door_params))
 
-        # 5. Windows (hosted)
+        # 4. Windows (hosted)
         for op in d.get("openings", []):
             if op.get("type") == "window":
                 win_params: Dict[str, Any] = {
@@ -81,6 +88,38 @@ class BimcraftAdapter:
                     win_params["sill"] = float(op["sillHeight"])
                 cmds.append(("window", win_params))
 
+        # 5. Visual Views & Renderings (if configured)
+        if views_config:
+            # Elevation views
+            if "elevation_south" in views_config:
+                cmds.append(("elevation", {"facing": "south", "name": "South Elevation"}))
+                cmds.append(("render", {"view": "South Elevation", "path": str(views_config["elevation_south"])}))
+
+            if "elevation_east" in views_config:
+                cmds.append(("elevation", {"facing": "east", "name": "East Elevation"}))
+                cmds.append(("render", {"view": "East Elevation", "path": str(views_config["elevation_east"])}))
+
+            # Longitudinal section view through middle of building
+            if "section" in views_config:
+                # Calculate middle Y for section line
+                walls = d.get("walls", [])
+                if walls:
+                    all_y = [w["start"][1] for w in walls] + [w["end"][1] for w in walls]
+                    all_x = [w["start"][0] for w in walls] + [w["end"][0] for w in walls]
+                    mid_y = (min(all_y) + max(all_y)) / 2.0
+                    min_x, max_x = min(all_x), max(all_x)
+                    cmds.append(("section", {"start": [min_x - 500, mid_y], "end": [max_x + 500, mid_y], "name": "Section A-A"}))
+                    cmds.append(("render", {"view": "Section A-A", "path": str(views_config["section"])}))
+
+            # 3D Axonometric / Isometric view
+            if "view_3d" in views_config:
+                cmds.append(("render", {
+                    "view": "{3D}",
+                    "azimuth": 315,
+                    "elevation": 30,
+                    "path": str(views_config["view_3d"]),
+                }))
+
         return cmds
 
     def execute_build(
@@ -88,6 +127,7 @@ class BimcraftAdapter:
         model: IntermediateBimModel,
         output_dir: str | Path,
         base_name: Optional[str] = None,
+        generate_3d_views: bool = True,
     ) -> BimcraftBuildResult:
         # Enforce approval gate
         valid_approval, reason = ApprovalGate.verify_approval(model)
@@ -108,7 +148,14 @@ class BimcraftAdapter:
         ifc_file = output_dir / f"{base_name}.ifc"
         png_file = output_dir / f"{base_name}.png"
 
-        commands = self.build_commands(model)
+        views_config: Dict[str, Path] = {}
+        if generate_3d_views:
+            views_config["view_3d"] = output_dir / f"{base_name}_3d.png"
+            views_config["elevation_south"] = output_dir / f"{base_name}_elev_south.png"
+            views_config["elevation_east"] = output_dir / f"{base_name}_elev_east.png"
+            views_config["section"] = output_dir / f"{base_name}_section_a.png"
+
+        commands = self.build_commands(model, views_config=views_config if generate_3d_views else None)
 
         cli_args = [str(self.cli_path), "run"]
         for cmd_id, params in commands:
@@ -141,6 +188,10 @@ class BimcraftAdapter:
             bimcraft_path=bimcraft_file,
             ifc_path=ifc_file,
             png_path=png_file,
+            view_3d_path=views_config.get("view_3d"),
+            elevation_south_path=views_config.get("elevation_south"),
+            elevation_east_path=views_config.get("elevation_east"),
+            section_path=views_config.get("section"),
             executed_commands=commands,
             raw_output=proc.stdout,
         )
@@ -159,4 +210,3 @@ class BimcraftAdapter:
             check=True,
         )
         return json.loads(proc.stdout)
-

@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-29T18:52:07.094720+00:00",
+  "timestamp": "2026-10-29T19:04:12.681965+00:00",
   "projectName": "Residential-Floor-Plan-8x8.7m",
   "overallStatus": "PASSED",
   "checks": [
@@ -7,7 +7,7 @@
       "category": "Export Deliverables",
       "name": "Native BIMCraft Project File Verification",
       "status": "PASSED",
-      "details": "File exists at residential-floor-plan-8x8.7m.bimcraft with size 164803 bytes"
+      "details": "File exists at residential-floor-plan-8x8.7m.bimcraft with size 165623 bytes"
     },
     {
       "category": "Export Deliverables",
@@ -19,7 +19,7 @@
       "category": "Export Deliverables",
       "name": "Plan Preview PNG File Verification",
       "status": "PASSED",
-      "details": "File exists at residential-floor-plan-8x8.7m.png with size 146080 bytes"
+      "details": "File exists at residential-floor-plan-8x8.7m.png with size 130434 bytes"
     },
     {
       "category": "Native Project Inspection",
