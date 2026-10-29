@@ -90,3 +90,4 @@ BIMCraft provides a command-driven BIM core that operates headlessly via `bimcra
 2. **2D to 3D Vertical Extrusion:**
    * 2D CAD files lack vertical level, sill, and wall heights.
    * **Mitigation:** Mandatory human approval gate is enforced before issuing construction commands.
+

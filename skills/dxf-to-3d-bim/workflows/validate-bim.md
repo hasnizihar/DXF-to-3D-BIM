@@ -10,3 +10,4 @@ Perform independent geometric, topological, and count validation on the generate
 4. Verify non-zero file sizes for `.bimcraft`, `.ifc`, and preview `.png`.
 5. Assemble findings into a validation report conforming to `validation-report.schema.json`.
 6. Categorize each check as `PASSED`, `WARNING`, or `UNVERIFIED`.
+

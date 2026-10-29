@@ -17,3 +17,4 @@ Execute verified BIMCraft commands to build the 3D model from the approved inter
 5. Save the native project (`.bimcraft`).
 6. Export IFC4 model (`.ifc`).
 7. Export plan preview image (`.png`).
+

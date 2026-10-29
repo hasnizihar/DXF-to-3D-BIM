@@ -39,3 +39,4 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
 # 2. Validate environment and run automated tests
 powershell -ExecutionPolicy Bypass -File .\scripts\validate-skill.ps1
 ```
+

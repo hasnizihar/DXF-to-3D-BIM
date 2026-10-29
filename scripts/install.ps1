@@ -79,3 +79,4 @@ if ($DryRun) {
 Write-Host ""
 Write-Host "Installation completed successfully!" -ForegroundColor Green
 exit 0
+

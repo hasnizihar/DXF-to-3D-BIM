@@ -16,3 +16,4 @@ Enforce user review and approval of the proposed 3D building parameters before i
    - Update model status to `approved`.
    - Record approval timestamp and notes conforming to `approval.schema.json`.
 4. **DO NOT proceed to BIM generation without this approval.**
+

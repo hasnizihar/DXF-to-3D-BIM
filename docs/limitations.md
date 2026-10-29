@@ -11,3 +11,4 @@
 ## 3. Engineering Boundaries
 * **Structural Safety**: The skill places conceptual architectural and structural elements. It does not perform structural calculations, load path modeling, or seismic/wind engineering.
 * **Code Compliance**: Building code compliance (fire egress, ADA accessibility, thermal envelopes) is not evaluated and remains the responsibility of licensed design professionals.
+

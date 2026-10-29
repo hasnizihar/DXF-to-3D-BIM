@@ -34,3 +34,4 @@ def test_insunits_mapping():
 def test_invalid_unit():
     with pytest.raises(ValueError):
         UnitConverter("lightyears")
+

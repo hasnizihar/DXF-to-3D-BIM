@@ -55,3 +55,4 @@ try {
 
 Write-Host "=== All BIMCraft checks passed ===" -ForegroundColor Green
 exit 0
+

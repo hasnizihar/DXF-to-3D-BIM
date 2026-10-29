@@ -15,3 +15,4 @@
 4. **Coordinate Transformation**:
    * Transform DXF model coordinates into positive Cartesian coordinates with `(0, 0)` at the bottom-left of the building footprint.
    * Maintain reversible coordinate mappings in the intermediate model metadata.
+

@@ -20,3 +20,4 @@ Every generated model must pass this checklist before delivery:
   - Element counts in IFC match intermediate model.
   - Plan preview image (`.png`) generated and visually verifiable.
   - Final validation report generated distinguishing PASSED, WARNING, and UNVERIFIED items.
+

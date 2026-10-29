@@ -14,3 +14,4 @@ Package and deliver all verified 3D BIM assets, visual previews, and validation 
 1. Place all artifacts in the user-specified or timestamped output directory.
 2. Present a clear markdown summary showing element counts, export file paths, and visual confirmation.
 3. Explicitly state the engineering boundary: structural sizing is conceptual and requires licensed professional sign-off.
+

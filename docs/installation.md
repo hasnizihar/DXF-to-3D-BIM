@@ -25,3 +25,4 @@ Run the skill verification script:
 powershell -ExecutionPolicy Bypass -File .\scripts\validate-skill.ps1
 ```
 All schema checks, BIMCraft checks, and automated pytest tests will run and report results.
+

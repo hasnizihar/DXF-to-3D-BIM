@@ -79,3 +79,4 @@ flowchart LR
 - **Unassociated Openings**: Log as unhosted openings in intermediate model; do not generate disconnected doors/windows.
 - **BIMCraft Execution Failure**: Halt immediately, preserve intermediate JSON and execution logs, and report actionable CLI output.
 - **Approval Rejection**: Update intermediate model based on user feedback and reset status to `awaiting_approval`.
+

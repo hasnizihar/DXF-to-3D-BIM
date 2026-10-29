@@ -14,3 +14,4 @@
 ### 3. Missing DXF Units
 * **Symptom**: DXF header `$INSUNITS` is `0` (unspecified).
 * **Resolution**: The skill will flag this during the `inspect` stage and prompt you to specify drawing units (e.g. millimeters or meters).
+

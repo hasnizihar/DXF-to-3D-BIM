@@ -15,3 +15,4 @@ When processing DXF files originating from `Sketch-to-CAD`, the standard layer n
 
 ## Third-Party Layer Fallback Matching
 For external DXF drawings that do not follow AIA layer standards, configure pattern regex rules in `config/layer-aliases.json`. If a layer cannot be classified with high confidence, queue it in the model's `assumptions` array and prompt the user for clarification before generating BIM geometry.
+

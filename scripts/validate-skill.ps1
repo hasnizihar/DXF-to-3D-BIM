@@ -73,3 +73,4 @@ if ($RunTests) {
 
 Write-Host "=== Skill validation successful! ===" -ForegroundColor Green
 exit 0
+

@@ -20,3 +20,4 @@
   * `window`: Host window onto wall segment `{wall, at, width, height}`.
   * `room`: Define spatial envelope and name `{boundary, name, level}`.
   * `roof`: Define roof envelope `{boundary, type, pitch}`.
+

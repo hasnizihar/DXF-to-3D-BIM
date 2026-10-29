@@ -11,3 +11,4 @@ Convert raw 2D line and polyline entities into normalized architectural walls, h
 5. Identify closed wall perimeter loops to form floor slab boundaries.
 6. Assemble the intermediate model conforming to `bim-model.schema.json`.
 7. Output `intermediate-model.json` with status `awaiting_approval`.
+

@@ -50,3 +50,4 @@ This document details the operational workflow for agents and users converting 2
 * Runs `bimcraft-cli info` on the generated IFC and BIMCraft projects.
 * Verifies element counts match intermediate specifications.
 * Emits `validation-report.json` and a human-readable summary.
+

@@ -10,3 +10,4 @@ Examine the incoming 2D DXF file to determine layer structure, drawing units, bo
    - Check available layers against `config/layer-aliases.json`.
    - Record skipped or non-architectural entities (e.g. title blocks, hatches).
 3. If an upstream `floor-plan-model.json` is provided, compare layer and wall counts with the JSON model.
+
