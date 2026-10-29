@@ -1,10 +1,12 @@
-"""Independent model validator conforming to validation-report.schema.json with deep IFC semantic checks."""
+"""Independent model validator conforming to validation-report.schema.json with deep IFC and geometric checks."""
 
 import json
+import math
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 import jsonschema
+from shapely.geometry import Polygon, Point, LineString
 
 from dxf_to_3d_bim.bimcraft_adapter import BimcraftAdapter, BimcraftBuildResult
 from dxf_to_3d_bim.ifc_parser import PureIfcParser
@@ -67,10 +69,9 @@ class ModelValidator:
                 overall_status = "FAILED"
 
         # 2. Inspect native .bimcraft project reopenability
-        bimcraft_info = {}
         if build_result.bimcraft_path and build_result.bimcraft_path.exists():
             try:
-                bimcraft_info = self.adapter.inspect_file(build_result.bimcraft_path)
+                self.adapter.inspect_file(build_result.bimcraft_path)
                 checks.append({
                     "category": "Native Project Inspection",
                     "name": "Reopen Native Project",
@@ -86,7 +87,7 @@ class ModelValidator:
                 })
                 overall_status = "FAILED"
 
-        # 3. Deep Independent IFC4 Parsing & Verification
+        # 3. Deep Independent IFC4 Parsing & Relationship Verification
         actual_counts: Dict[str, int] = {}
         if build_result.ifc_path and build_result.ifc_path.exists():
             try:
@@ -154,7 +155,6 @@ class ModelValidator:
         gen_windows = actual_counts.get("window", 0)
         gen_levels = actual_counts.get("storey", 0)
 
-        # Walls check
         wall_diff = abs(gen_walls - expected_walls)
         checks.append({
             "category": "Geometric Topology",
@@ -164,7 +164,6 @@ class ModelValidator:
             "numericalDifference": float(wall_diff),
         })
 
-        # Doors check
         door_diff = abs(gen_doors - expected_doors)
         checks.append({
             "category": "Geometric Topology",
@@ -174,7 +173,6 @@ class ModelValidator:
             "numericalDifference": float(door_diff),
         })
 
-        # Windows check
         win_diff = abs(gen_windows - expected_windows)
         checks.append({
             "category": "Geometric Topology",
@@ -183,6 +181,10 @@ class ModelValidator:
             "details": f"Expected {expected_windows} windows, found {gen_windows} in IFC",
             "numericalDifference": float(win_diff),
         })
+
+        # 5. Deep Geometric Integrity Checks
+        geom_checks = self._validate_model_geometry(model)
+        checks.extend(geom_checks)
 
         if any(c["status"] == "FAILED" for c in checks):
             overall_status = "FAILED"
@@ -222,3 +224,90 @@ class ModelValidator:
             jsonschema.validate(instance=report, schema=schema)
 
         return report
+
+    def _validate_model_geometry(self, model: IntermediateBimModel) -> List[Dict[str, Any]]:
+        """Validates opening placements, wall lengths, and slab boundaries."""
+        results: List[Dict[str, Any]] = []
+        d = model.data
+        wall_map = {w["id"]: w for w in d.get("walls", [])}
+
+        # 1. Opening Placement & Wall Overhang Check
+        misaligned_openings = []
+        overhanging_openings = []
+
+        for op in d.get("openings", []):
+            op_id = op.get("id", "op")
+            wall_id = op.get("wallId")
+            host_wall = wall_map.get(wall_id)
+
+            if not host_wall:
+                misaligned_openings.append(f"{op_id} (missing host wall '{wall_id}')")
+                continue
+
+            # Line of host wall
+            p1 = host_wall["start"]
+            p2 = host_wall["end"]
+            line = LineString([p1, p2])
+            center_pt = Point(op["center"])
+            dist = line.distance(center_pt)
+
+            if dist > 50.0:  # mm
+                misaligned_openings.append(f"{op_id} (distance {dist:.1f}mm from wall '{wall_id}')")
+
+            # Check overhang: width cannot exceed wall length
+            wall_len = math.hypot(p2[0] - p1[0], p2[1] - p1[1])
+            width = op.get("width", 900.0)
+            if width > wall_len + 50.0:
+                overhanging_openings.append(f"{op_id} (width {width}mm exceeds wall length {wall_len:.1f}mm)")
+
+        if not misaligned_openings:
+            results.append({
+                "category": "Geometric Topology",
+                "name": "Opening Host Alignment",
+                "status": "PASSED",
+                "details": f"All {len(d.get('openings', []))} openings align within tolerance to their host walls.",
+            })
+        else:
+            results.append({
+                "category": "Geometric Topology",
+                "name": "Opening Host Alignment",
+                "status": "WARNING",
+                "details": f"Misaligned openings: {', '.join(misaligned_openings[:3])}",
+            })
+
+        if not overhanging_openings:
+            results.append({
+                "category": "Geometric Topology",
+                "name": "Opening Boundary Containment",
+                "status": "PASSED",
+                "details": "All opening widths fit cleanly within their host wall lengths.",
+            })
+        else:
+            results.append({
+                "category": "Geometric Topology",
+                "name": "Opening Boundary Containment",
+                "status": "WARNING",
+                "details": f"Overhanging openings: {', '.join(overhanging_openings[:3])}",
+            })
+
+        # 2. Floor Slab Boundary Closure & Area Check
+        for fl in d.get("floors", []):
+            boundary = fl.get("boundary", [])
+            if len(boundary) >= 3:
+                poly = Polygon(boundary)
+                if poly.is_valid and poly.area > 100_000.0:  # > 0.1 m2
+                    results.append({
+                        "category": "Geometric Topology",
+                        "name": f"Floor Slab {fl.get('id', 'fl')} Boundary",
+                        "status": "PASSED",
+                        "details": f"Slab boundary is a closed, valid polygon with area {poly.area / 1_000_000.0:.2f} m².",
+                    })
+                else:
+                    results.append({
+                        "category": "Geometric Topology",
+                        "name": f"Floor Slab {fl.get('id', 'fl')} Boundary",
+                        "status": "FAILED",
+                        "details": "Slab boundary polygon is self-intersecting or invalid.",
+                    })
+
+        return results

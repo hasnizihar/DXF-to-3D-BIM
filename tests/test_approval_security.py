@@ -1,4 +1,4 @@
-"""Tests for approval security, hash tamper protection, and gate enforcement."""
+"""Comprehensive tests for approval security, hash tamper protection, and gate enforcement."""
 
 import pytest
 from dxf_to_3d_bim.approval import ApprovalGate, compute_model_hash
@@ -15,7 +15,7 @@ def test_tamper_detection_on_wall_coordinates():
     valid, msg = ApprovalGate.verify_approval(model)
     assert valid is True
 
-    # Step 2: Malicious or accidental modification to wall start coordinate
+    # Step 2: Modification to wall start coordinate
     model.data["walls"][0]["start"][0] = 50.0  # shifted by 50mm
 
     # Step 3: Approval gate must detect tamper and reject
@@ -43,6 +43,18 @@ def test_tamper_detection_on_opening_dimensions():
     assert valid is False
     assert "changed since approval" in msg
 
+def test_stale_or_replaced_approval_hash():
+    walls = [ReconstructedWall(id="w1", classification="exterior", start=(0, 0), end=(5000, 0), thickness=200)]
+    model = IntermediateBimModel.create("SecureProject", "test.dxf", "mm", 1.0, walls, [], [], [])
+    ApprovalGate.approve(model)
+
+    # Attacker replaces modelHash with arbitrary fake hash
+    model.data["approval"]["modelHash"] = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+    valid, msg = ApprovalGate.verify_approval(model)
+    assert valid is False
+    assert "changed since approval" in msg
+
 def test_adapter_refuses_unapproved_or_tampered_model(tmp_path):
     adapter = BimcraftAdapter()
     walls = [ReconstructedWall(id="w1", classification="exterior", start=(0, 0), end=(5000, 0), thickness=200)]
@@ -60,4 +72,3 @@ def test_adapter_refuses_unapproved_or_tampered_model(tmp_path):
     with pytest.raises(PermissionError) as exc_info:
         adapter.execute_build(model, output_dir=tmp_path)
     assert "changed since approval" in str(exc_info.value)
-

@@ -1,0 +1,640 @@
+{
+  "schemaVersion": "1.0.0",
+  "metadata": {
+    "projectName": "Residential-Floor-Plan-8x8.7m",
+    "sourceJsonPath": "D:\\Agent Skills\\sketch-to-cad-main\\floor-plan-model.json",
+    "createdAt": "2026-10-29T18:51:56.435891+00:00",
+    "updatedAt": "2026-10-29T18:52:01.082717+00:00"
+  },
+  "status": "approved",
+  "units": {
+    "sourceUnits": "mm",
+    "normalizedUnits": "mm",
+    "scaleFactor": 1.0,
+    "originOffset": [
+      0.0,
+      0.0
+    ]
+  },
+  "levels": [
+    {
+      "id": "level_1",
+      "name": "Level 1",
+      "elevation": 0.0,
+      "height": 3000.0
+    },
+    {
+      "id": "level_2",
+      "name": "Level 2",
+      "elevation": 3000.0,
+      "height": 3000.0
+    }
+  ],
+  "walls": [
+    {
+      "id": "W-EXT-S",
+      "classification": "exterior",
+      "start": [
+        0.0,
+        0.0
+      ],
+      "end": [
+        8000.0,
+        0.0
+      ],
+      "thickness": 200.0,
+      "height": 3000.0,
+      "levelId": "Level 1",
+      "confidence": "high",
+      "sourceEntities": [
+        "A-WALL-EXTR"
+      ]
+    },
+    {
+      "id": "W-EXT-E",
+      "classification": "exterior",
+      "start": [
+        8000.0,
+        0.0
+      ],
+      "end": [
+        8000.0,
+        8700.0
+      ],
+      "thickness": 200.0,
+      "height": 3000.0,
+      "levelId": "Level 1",
+      "confidence": "high",
+      "sourceEntities": [
+        "A-WALL-EXTR"
+      ]
+    },
+    {
+      "id": "W-EXT-N",
+      "classification": "exterior",
+      "start": [
+        8000.0,
+        8700.0
+      ],
+      "end": [
+        0.0,
+        8700.0
+      ],
+      "thickness": 200.0,
+      "height": 3000.0,
+      "levelId": "Level 1",
+      "confidence": "high",
+      "sourceEntities": [
+        "A-WALL-EXTR"
+      ]
+    },
+    {
+      "id": "W-EXT-W",
+      "classification": "exterior",
+      "start": [
+        0.0,
+        8700.0
+      ],
+      "end": [
+        0.0,
+        0.0
+      ],
+      "thickness": 200.0,
+      "height": 3000.0,
+      "levelId": "Level 1",
+      "confidence": "high",
+      "sourceEntities": [
+        "A-WALL-EXTR"
+      ]
+    },
+    {
+      "id": "W-INT-V1",
+      "classification": "interior",
+      "start": [
+        3800.0,
+        200.0
+      ],
+      "end": [
+        3800.0,
+        8500.0
+      ],
+      "thickness": 100.0,
+      "height": 3000.0,
+      "levelId": "Level 1",
+      "confidence": "high",
+      "sourceEntities": [
+        "A-WALL-INTR"
+      ]
+    },
+    {
+      "id": "W-INT-V2",
+      "classification": "interior",
+      "start": [
+        5000.0,
+        200.0
+      ],
+      "end": [
+        5000.0,
+        8500.0
+      ],
+      "thickness": 100.0,
+      "height": 3000.0,
+      "levelId": "Level 1",
+      "confidence": "high",
+      "sourceEntities": [
+        "A-WALL-INTR"
+      ]
+    },
+    {
+      "id": "W-INT-H-WC",
+      "classification": "interior",
+      "start": [
+        3800.0,
+        1600.0
+      ],
+      "end": [
+        5000.0,
+        1600.0
+      ],
+      "thickness": 100.0,
+      "height": 3000.0,
+      "levelId": "Level 1",
+      "confidence": "high",
+      "sourceEntities": [
+        "A-WALL-INTR"
+      ]
+    },
+    {
+      "id": "W-INT-H1-L",
+      "classification": "interior",
+      "start": [
+        200.0,
+        7000.0
+      ],
+      "end": [
+        3800.0,
+        7000.0
+      ],
+      "thickness": 100.0,
+      "height": 3000.0,
+      "levelId": "Level 1",
+      "confidence": "high",
+      "sourceEntities": [
+        "A-WALL-INTR"
+      ]
+    },
+    {
+      "id": "W-INT-H1-R",
+      "classification": "interior",
+      "start": [
+        5000.0,
+        7000.0
+      ],
+      "end": [
+        7800.0,
+        7000.0
+      ],
+      "thickness": 100.0,
+      "height": 3000.0,
+      "levelId": "Level 1",
+      "confidence": "high",
+      "sourceEntities": [
+        "A-WALL-INTR"
+      ]
+    },
+    {
+      "id": "W-INT-H2-R",
+      "classification": "interior",
+      "start": [
+        5000.0,
+        5200.0
+      ],
+      "end": [
+        7800.0,
+        5200.0
+      ],
+      "thickness": 100.0,
+      "height": 3000.0,
+      "levelId": "Level 1",
+      "confidence": "high",
+      "sourceEntities": [
+        "A-WALL-INTR"
+      ]
+    },
+    {
+      "id": "W-INT-H3-L",
+      "classification": "interior",
+      "start": [
+        200.0,
+        3000.0
+      ],
+      "end": [
+        3800.0,
+        3000.0
+      ],
+      "thickness": 100.0,
+      "height": 3000.0,
+      "levelId": "Level 1",
+      "confidence": "high",
+      "sourceEntities": [
+        "A-WALL-INTR"
+      ]
+    },
+    {
+      "id": "W-INT-H3-R",
+      "classification": "interior",
+      "start": [
+        5000.0,
+        3000.0
+      ],
+      "end": [
+        7800.0,
+        3000.0
+      ],
+      "thickness": 100.0,
+      "height": 3000.0,
+      "levelId": "Level 1",
+      "confidence": "high",
+      "sourceEntities": [
+        "A-WALL-INTR"
+      ]
+    }
+  ],
+  "openings": [
+    {
+      "id": "D-ENTR",
+      "type": "door",
+      "wallId": "W-EXT-E",
+      "center": [
+        8000.0,
+        7800.0
+      ],
+      "width": 1000.0,
+      "height": 2100.0,
+      "confidence": "high"
+    },
+    {
+      "id": "WIN-BATH",
+      "type": "window",
+      "wallId": "W-EXT-E",
+      "center": [
+        8000.0,
+        6100.0
+      ],
+      "width": 800.0,
+      "height": 1200.0,
+      "confidence": "high",
+      "sillHeight": 1400.0
+    },
+    {
+      "id": "WIN-BED3",
+      "type": "window",
+      "wallId": "W-EXT-E",
+      "center": [
+        8000.0,
+        4100.0
+      ],
+      "width": 800.0,
+      "height": 1200.0,
+      "confidence": "high",
+      "sillHeight": 900.0
+    },
+    {
+      "id": "WIN-BED4",
+      "type": "window",
+      "wallId": "W-EXT-E",
+      "center": [
+        8000.0,
+        1600.0
+      ],
+      "width": 800.0,
+      "height": 1200.0,
+      "confidence": "high",
+      "sillHeight": 900.0
+    },
+    {
+      "id": "WIN-KIT",
+      "type": "window",
+      "wallId": "W-EXT-W",
+      "center": [
+        0.0,
+        7750.0
+      ],
+      "width": 1000.0,
+      "height": 1200.0,
+      "confidence": "high",
+      "sillHeight": 1050.0
+    },
+    {
+      "id": "WIN-LIV-1",
+      "type": "window",
+      "wallId": "W-EXT-W",
+      "center": [
+        0.0,
+        5600.0
+      ],
+      "width": 900.0,
+      "height": 1200.0,
+      "confidence": "high",
+      "sillHeight": 900.0
+    },
+    {
+      "id": "WIN-LIV-2",
+      "type": "window",
+      "wallId": "W-EXT-W",
+      "center": [
+        0.0,
+        4400.0
+      ],
+      "width": 900.0,
+      "height": 1200.0,
+      "confidence": "high",
+      "sillHeight": 900.0
+    },
+    {
+      "id": "WIN-BED2",
+      "type": "window",
+      "wallId": "W-EXT-W",
+      "center": [
+        0.0,
+        1600.0
+      ],
+      "width": 1800.0,
+      "height": 1200.0,
+      "confidence": "high",
+      "sillHeight": 900.0
+    },
+    {
+      "id": "D-KIT",
+      "type": "door",
+      "wallId": "W-INT-V1",
+      "center": [
+        3800.0,
+        8000.0
+      ],
+      "width": 800.0,
+      "height": 2100.0,
+      "confidence": "high"
+    },
+    {
+      "id": "D-LIV",
+      "type": "door",
+      "wallId": "W-INT-V1",
+      "center": [
+        3800.0,
+        6500.0
+      ],
+      "width": 850.0,
+      "height": 2100.0,
+      "confidence": "high"
+    },
+    {
+      "id": "D-BED2",
+      "type": "door",
+      "wallId": "W-INT-V1",
+      "center": [
+        3800.0,
+        2500.0
+      ],
+      "width": 850.0,
+      "height": 2100.0,
+      "confidence": "high"
+    },
+    {
+      "id": "D-FOYER",
+      "type": "window",
+      "wallId": "W-INT-V2",
+      "center": [
+        5000.0,
+        7800.0
+      ],
+      "width": 900.0,
+      "height": 1200.0,
+      "confidence": "high"
+    },
+    {
+      "id": "D-BATH",
+      "type": "door",
+      "wallId": "W-INT-V2",
+      "center": [
+        5000.0,
+        6500.0
+      ],
+      "width": 750.0,
+      "height": 2100.0,
+      "confidence": "high"
+    },
+    {
+      "id": "D-BED3",
+      "type": "door",
+      "wallId": "W-INT-V2",
+      "center": [
+        5000.0,
+        4700.0
+      ],
+      "width": 800.0,
+      "height": 2100.0,
+      "confidence": "high"
+    },
+    {
+      "id": "D-BED4",
+      "type": "door",
+      "wallId": "W-INT-V2",
+      "center": [
+        5000.0,
+        2500.0
+      ],
+      "width": 850.0,
+      "height": 2100.0,
+      "confidence": "high"
+    },
+    {
+      "id": "D-WC",
+      "type": "door",
+      "wallId": "W-INT-H-WC",
+      "center": [
+        4400.0,
+        1600.0
+      ],
+      "width": 700.0,
+      "height": 2100.0,
+      "confidence": "high"
+    }
+  ],
+  "floors": [
+    {
+      "id": "floor_1",
+      "levelId": "Level 1",
+      "thickness": 150.0,
+      "elevation": 0.0,
+      "boundary": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          8000.0,
+          0.0
+        ],
+        [
+          8000.0,
+          8700.0
+        ],
+        [
+          0.0,
+          8700.0
+        ]
+      ]
+    }
+  ],
+  "rooms": [
+    {
+      "id": "R1",
+      "name": "KITCHEN",
+      "levelId": "Level 1",
+      "approximateArea": 5.4,
+      "labelPosition": [
+        2000.0,
+        7750.0
+      ]
+    },
+    {
+      "id": "R2",
+      "name": "LIVING / BEDROOM 1",
+      "levelId": "Level 1",
+      "approximateArea": 14.4,
+      "labelPosition": [
+        2000.0,
+        5000.0
+      ]
+    },
+    {
+      "id": "R3",
+      "name": "BEDROOM 2",
+      "levelId": "Level 1",
+      "approximateArea": 10.1,
+      "labelPosition": [
+        2000.0,
+        1600.0
+      ]
+    },
+    {
+      "id": "R4",
+      "name": "ENTRANCE / FOYER",
+      "levelId": "Level 1",
+      "approximateArea": 4.2,
+      "labelPosition": [
+        6400.0,
+        7750.0
+      ]
+    },
+    {
+      "id": "R5",
+      "name": "BATHROOM",
+      "levelId": "Level 1",
+      "approximateArea": 5.0,
+      "labelPosition": [
+        6400.0,
+        6100.0
+      ]
+    },
+    {
+      "id": "R6",
+      "name": "BEDROOM 3",
+      "levelId": "Level 1",
+      "approximateArea": 6.2,
+      "labelPosition": [
+        6400.0,
+        4100.0
+      ]
+    },
+    {
+      "id": "R7",
+      "name": "BEDROOM 4",
+      "levelId": "Level 1",
+      "approximateArea": 7.8,
+      "labelPosition": [
+        6400.0,
+        1600.0
+      ]
+    },
+    {
+      "id": "R8",
+      "name": "CENTRAL CORRIDOR",
+      "levelId": "Level 1",
+      "approximateArea": 8.3,
+      "labelPosition": [
+        4400.0,
+        5000.0
+      ]
+    },
+    {
+      "id": "R9",
+      "name": "POWDER ROOM (WC)",
+      "levelId": "Level 1",
+      "approximateArea": 1.7,
+      "labelPosition": [
+        4400.0,
+        900.0
+      ]
+    }
+  ],
+  "roofs": [],
+  "assumptions": [
+    {
+      "id": "U1",
+      "target": "Depth Dimension Chains (Left vs Right vs Overall)",
+      "description": "The right-side chain sums to 8500mm (1500+1800+2200+3000), but overall depth is annotated as 8700mm. Meanwhile, the left-side chain sums to 9100mm (1800+4100+3200), exceeding the 8700mm envelope by 400mm.",
+      "assumedValue": "Overall envelope fixed at 8700mm depth. Right-side chain aligns at 8500mm + 200mm exterior wall = 8700mm. Left-side rooms normalized to fit collinear partitions (Kitchen ~1700mm, Mid-Left ~4000mm, Bot-Left ~3000mm).",
+      "confidence": "medium",
+      "status": "unresolved"
+    },
+    {
+      "id": "U2",
+      "target": "North Horizontal Partition Collinearity",
+      "description": "Entrance depth is annotated as 1500mm, while Kitchen depth is annotated as 1800mm, yet the partition line is drawn continuously across the central corridor.",
+      "assumedValue": "Collinear partition at Y=7000mm (Entrance clear depth = 1500mm, Kitchen clear depth = 1500mm from inner north wall face).",
+      "confidence": "medium",
+      "status": "unresolved"
+    },
+    {
+      "id": "U3",
+      "target": "Wall Thicknesses",
+      "description": "Exterior and interior wall thicknesses are not dimensioned.",
+      "assumedValue": "Exterior walls = 200mm (AIA layer A-WALL-EXTR); Interior partitions = 100mm (AIA layer A-WALL-INTR).",
+      "confidence": "high",
+      "status": "unresolved"
+    },
+    {
+      "id": "U4",
+      "target": "Corridor Powder Room (WC) Depth",
+      "description": "A dedicated WC room with toilet bowl and swing door is situated at the south end of the central corridor, but its depth is not dimensioned.",
+      "assumedValue": "Clear width 1200mm x clear depth 1400mm (partition at Y=1600mm), with standard 700mm door.",
+      "confidence": "medium",
+      "status": "unresolved"
+    },
+    {
+      "id": "U5",
+      "target": "Kitchen West Window Width",
+      "description": "West kitchen window dimension has ambiguous handwriting (appears as 1000mm or 1900mm).",
+      "assumedValue": "Single window unit 1000mm width centered at Y=7750mm.",
+      "confidence": "medium",
+      "status": "unresolved"
+    },
+    {
+      "id": "U6",
+      "target": "Entrance-to-Corridor Opening Style",
+      "description": "An arrow pointing left (<-) indicates a sliding door or cased opening between Foyer and Central Corridor.",
+      "assumedValue": "900mm wide cased pocket opening or sliding door.",
+      "confidence": "medium",
+      "status": "unresolved"
+    }
+  ],
+  "approval": {
+    "isApproved": true,
+    "approvedBy": "Project Architect",
+    "approvedAt": "2026-10-29T18:52:01.082717+00:00",
+    "modelHash": "380952cd9b92e878aed9a1238eb1d9ebb0a15de3484957ad83cf635b086a02d5",
+    "notes": "Approved genuine upstream Sketch-to-CAD residential design"
+  }
+}

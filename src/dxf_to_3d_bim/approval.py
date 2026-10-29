@@ -28,7 +28,19 @@ def compute_model_hash(model_data: Dict[str, Any]) -> str:
 
 
 class ApprovalGate:
-    """Enforces that intermediate models cannot be sent to BIM generation without valid human approval."""
+    """Enforces that intermediate models cannot be sent to BIM generation without valid human approval.
+
+    Threat Model & Integrity Guarantees:
+    - SHA-256 content hashing guarantees geometric and semantic integrity between human review and build.
+    - Note: Content hashing validates that the model has not been altered or corrupted; it does NOT prove
+      cryptographic human identity (which would require PKI/digital signatures).
+    - Prevents stale approvals, replaced approval tokens, modified dimensions, and unauthorized additions.
+    """
+
+    @staticmethod
+    def create_immutable_snapshot(model: IntermediateBimModel) -> Dict[str, Any]:
+        """Creates a deep copy snapshot of the approved model state to protect against concurrent modification."""
+        return copy.deepcopy(model.data)
 
     @staticmethod
     def generate_proposal_summary(model: IntermediateBimModel) -> Dict[str, Any]:

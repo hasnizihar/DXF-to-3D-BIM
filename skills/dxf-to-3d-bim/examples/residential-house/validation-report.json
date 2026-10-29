@@ -1,0 +1,107 @@
+{
+  "timestamp": "2026-10-29T18:52:07.094720+00:00",
+  "projectName": "Residential-Floor-Plan-8x8.7m",
+  "overallStatus": "PASSED",
+  "checks": [
+    {
+      "category": "Export Deliverables",
+      "name": "Native BIMCraft Project File Verification",
+      "status": "PASSED",
+      "details": "File exists at residential-floor-plan-8x8.7m.bimcraft with size 164803 bytes"
+    },
+    {
+      "category": "Export Deliverables",
+      "name": "IFC4 Export File Verification",
+      "status": "PASSED",
+      "details": "File exists at residential-floor-plan-8x8.7m.ifc with size 31149 bytes"
+    },
+    {
+      "category": "Export Deliverables",
+      "name": "Plan Preview PNG File Verification",
+      "status": "PASSED",
+      "details": "File exists at residential-floor-plan-8x8.7m.png with size 146080 bytes"
+    },
+    {
+      "category": "Native Project Inspection",
+      "name": "Reopen Native Project",
+      "status": "PASSED",
+      "details": "Successfully reopened and inspected .bimcraft project structure"
+    },
+    {
+      "category": "IFC Verification",
+      "name": "Parse IFC Model",
+      "status": "PASSED",
+      "details": "IFC4 parsed successfully (schema: IFC4)"
+    },
+    {
+      "category": "Geometric Topology",
+      "name": "Wall Voiding and Opening Penetration",
+      "status": "PASSED",
+      "details": "All doors and windows are verified to create IfcOpeningElement voids that cut their host IfcWalls via IfcRelVoidsElement and IfcRelFillsElement."
+    },
+    {
+      "category": "Spatial Structure",
+      "name": "Storey Containment",
+      "status": "PASSED",
+      "details": "All architectural elements are formally assigned to building storeys via IfcRelContainedInSpatialStructure."
+    },
+    {
+      "category": "Geometric Topology",
+      "name": "Wall Element Count",
+      "status": "PASSED",
+      "details": "Expected 12 walls, found 12 in IFC",
+      "numericalDifference": 0.0
+    },
+    {
+      "category": "Geometric Topology",
+      "name": "Door Opening Count",
+      "status": "PASSED",
+      "details": "Expected 8 doors, found 8 in IFC",
+      "numericalDifference": 0.0
+    },
+    {
+      "category": "Geometric Topology",
+      "name": "Window Opening Count",
+      "status": "PASSED",
+      "details": "Expected 8 windows, found 8 in IFC",
+      "numericalDifference": 0.0
+    },
+    {
+      "category": "Geometric Topology",
+      "name": "Opening Host Alignment",
+      "status": "PASSED",
+      "details": "All 16 openings align within tolerance to their host walls."
+    },
+    {
+      "category": "Geometric Topology",
+      "name": "Opening Boundary Containment",
+      "status": "PASSED",
+      "details": "All opening widths fit cleanly within their host wall lengths."
+    },
+    {
+      "category": "Geometric Topology",
+      "name": "Floor Slab floor_1 Boundary",
+      "status": "PASSED",
+      "details": "Slab boundary is a closed, valid polygon with area 69.60 m\u00b2."
+    }
+  ],
+  "elementSummary": {
+    "expected": {
+      "walls": 12,
+      "doors": 8,
+      "windows": 8,
+      "levels": 2
+    },
+    "generated": {
+      "walls": 12,
+      "doors": 8,
+      "windows": 8,
+      "levels": 2
+    }
+  },
+  "deliverables": {
+    "bimcraftPath": "deliverables_residential\\residential-floor-plan-8x8.7m.bimcraft",
+    "ifcPath": "deliverables_residential\\residential-floor-plan-8x8.7m.ifc",
+    "previewPngPath": "deliverables_residential\\residential-floor-plan-8x8.7m.png"
+  }
+}
