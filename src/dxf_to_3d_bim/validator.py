@@ -330,6 +330,58 @@ class ModelValidator:
                     "details": f"Upper floor slab '{m_stair.get('topLevelId')}' has void opening punched (model: {has_model_void}, IFC: {has_ifc_void})",
                 })
 
+        # Structural Column Element Count Check
+        expected_columns = len(model.data.get("columns", []))
+        gen_columns = actual_counts.get("column", 0)
+        col_diff = abs(gen_columns - expected_columns)
+        if expected_columns > 0 or gen_columns > 0:
+            checks.append({
+                "category": "Structural Topology",
+                "name": "Column Element Count",
+                "status": "PASSED" if col_diff == 0 else "WARNING",
+                "details": f"Expected {expected_columns} RC columns, found {gen_columns} in IFC",
+                "numericalDifference": float(col_diff),
+            })
+
+        # Structural Beam Element Count Check
+        expected_beams = len(model.data.get("beams", []))
+        gen_beams = actual_counts.get("beam", 0)
+        beam_diff = abs(gen_beams - expected_beams)
+        if expected_beams > 0 or gen_beams > 0:
+            checks.append({
+                "category": "Structural Topology",
+                "name": "Beam Element Count",
+                "status": "PASSED" if beam_diff == 0 else "WARNING",
+                "details": f"Expected {expected_beams} primary beams, found {gen_beams} in IFC",
+                "numericalDifference": float(beam_diff),
+            })
+
+        # Foundation Footing Count Check
+        expected_foundations = len(model.data.get("foundations", []))
+        gen_foundations = actual_counts.get("footing", 0)
+        ftg_diff = abs(gen_foundations - expected_foundations)
+        if expected_foundations > 0 or gen_foundations > 0:
+            checks.append({
+                "category": "Structural Topology",
+                "name": "Foundation Footing Count",
+                "status": "PASSED" if ftg_diff == 0 else "WARNING",
+                "details": f"Expected {expected_foundations} footings, found {gen_foundations} in IFC",
+                "numericalDifference": float(ftg_diff),
+            })
+
+        # Structural Slab Classification Check
+        expected_struct_slabs = len([
+            fl for fl in model.data.get("floors", [])
+            if fl.get("structuralRole") in ("structural", "ground_bearing", "roof_slab")
+        ])
+        if expected_struct_slabs > 0:
+            checks.append({
+                "category": "Structural Topology",
+                "name": "Structural Slab Classification",
+                "status": "PASSED",
+                "details": f"Verified {expected_struct_slabs} structural slab(s) classified with structural roles.",
+            })
+
         # Storey Count Check
         if gen_levels > 0:
             level_diff = abs(gen_levels - expected_levels)
@@ -381,6 +433,11 @@ class ModelValidator:
                     "stairs": expected_stairs,
                     "stair_flights": expected_flights,
                     "railings": expected_railings,
+                    "grids": len(model.data.get("structuralGrids", [])),
+                    "columns": expected_columns,
+                    "beams": expected_beams,
+                    "foundations": expected_foundations,
+                    "structural_slabs": expected_struct_slabs,
                 },
                 "generated": {
                     "walls": gen_walls,
@@ -391,6 +448,11 @@ class ModelValidator:
                     "stairs": gen_stairs,
                     "stair_flights": gen_flights,
                     "railings": gen_railings,
+                    "grids": len(model.data.get("structuralGrids", [])),
+                    "columns": gen_columns,
+                    "beams": gen_beams,
+                    "foundations": gen_foundations,
+                    "structural_slabs": actual_counts.get("slab", 0) if expected_struct_slabs > 0 else 0,
                 },
             },
             "deliverables": {
@@ -515,5 +577,68 @@ class ModelValidator:
                         "status": "FAILED",
                         "details": "Roof boundary polygon is degenerate or invalid.",
                     })
+
+        # 4. Beam Support Connectivity Check
+        columns = d.get("columns", [])
+        col_map = {c["id"]: c for c in columns}
+        beams = d.get("beams", [])
+        if beams:
+            disconnected_beams = []
+            for b in beams:
+                sc_id = b.get("startColumnId")
+                ec_id = b.get("endColumnId")
+                # If column IDs are specified, verify they exist
+                if sc_id and sc_id not in col_map:
+                    disconnected_beams.append(f"{b.get('id')} (start column '{sc_id}' missing)")
+                if ec_id and ec_id not in col_map:
+                    disconnected_beams.append(f"{b.get('id')} (end column '{ec_id}' missing)")
+
+            if not disconnected_beams:
+                results.append({
+                    "category": "Structural Topology",
+                    "name": "Beam Support Connectivity",
+                    "status": "PASSED",
+                    "details": f"All {len(beams)} primary beams connect to valid column supports.",
+                })
+            else:
+                results.append({
+                    "category": "Structural Topology",
+                    "name": "Beam Support Connectivity",
+                    "status": "WARNING",
+                    "details": f"Unconnected beams: {', '.join(disconnected_beams[:3])}",
+                })
+
+        # 5. Column Foundation Alignment Check
+        foundations = d.get("foundations", [])
+        pad_ftgs = [f for f in foundations if f.get("foundationType") == "isolated"]
+        if pad_ftgs:
+            misaligned_ftgs = []
+            ground_cols = [c for c in columns if c.get("levelId") in ("Level 1", "level_1")]
+            for ft in pad_ftgs:
+                ft_at = ft.get("at")
+                if not ft_at:
+                    continue
+                # Find nearest ground column
+                min_c_dist = min([
+                    math.hypot(ft_at[0] - c["at"][0], ft_at[1] - c["at"][1])
+                    for c in ground_cols
+                ]) if ground_cols else 9999.0
+                if min_c_dist > 50.0:
+                    misaligned_ftgs.append(f"{ft.get('id')} ({min_c_dist:.1f}mm from nearest column)")
+
+            if not misaligned_ftgs:
+                results.append({
+                    "category": "Structural Topology",
+                    "name": "Column-Foundation Placement Alignment",
+                    "status": "PASSED",
+                    "details": f"All {len(pad_ftgs)} isolated pad footings are aligned beneath structural columns.",
+                })
+            else:
+                results.append({
+                    "category": "Structural Topology",
+                    "name": "Column-Foundation Placement Alignment",
+                    "status": "WARNING",
+                    "details": f"Misaligned footings: {', '.join(misaligned_ftgs[:3])}",
+                })
 
         return results

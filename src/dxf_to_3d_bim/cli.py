@@ -1,9 +1,10 @@
 """Comprehensive command-line interface for DXF-to-3D-BIM."""
 
 import json
+import math
 import sys
 from pathlib import Path
-from typing import Optional, Any, Dict, List
+from typing import Optional, Any, Dict, List, Tuple
 
 import typer
 from rich.console import Console
@@ -100,6 +101,171 @@ def inspect(
         raise typer.Exit(1)
 
 
+def _build_structural_elements(
+    parsed: Any,
+    classifier: LayerClassifier,
+    walls: List[Any],
+    floors: List[Any],
+    storeys_count: int,
+    storey_height: float,
+    ground_elevation: float,
+    structure_mode: str,
+    column_default: str,
+    column_profile: str,
+    column_diameter: float,
+    beam_default: str,
+    foundation_type: str,
+    foundation_thickness: float,
+    foundation_depth: float,
+    generate_grids: bool,
+    structural_config_path: Optional[str] = None,
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]], List[Any]]:
+    """Builds structural grids, columns, beams, foundations, and classified slabs."""
+    eff_mode = (structure_mode or "none").strip().lower()
+    if eff_mode == "none":
+        return [], [], [], [], floors
+
+    from dxf_to_3d_bim.structural_engine import ParametricStructuralEngine
+
+    # Column dimensions
+    col_w, col_d = 300.0, 300.0
+    if "x" in column_default.lower():
+        try:
+            parts = column_default.lower().split("x")
+            col_w, col_d = float(parts[0]), float(parts[1])
+        except Exception:
+            pass
+
+    # Beam dimensions
+    bm_w, bm_d = 230.0, 450.0
+    if "x" in beam_default.lower():
+        try:
+            parts = beam_default.lower().split("x")
+            bm_w, bm_d = float(parts[0]), float(parts[1])
+        except Exception:
+            pass
+
+    # 1. Detect column locations from DXF circles/lines or wall corners
+    col_locations = []
+    col_circles = [c for c in getattr(parsed, "circles", []) if classifier.is_column_layer(c.layer)]
+    if col_circles:
+        col_locations = [c.center for c in col_circles]
+        column_profile = "circular"
+        column_diameter = col_circles[0].radius * 2.0
+    else:
+        col_lines = [l for l in parsed.lines if classifier.is_column_layer(l.layer)]
+        if col_lines:
+            # Cluster line endpoints
+            raw_pts = [l.start for l in col_lines] + [l.end for l in col_lines]
+            for p in raw_pts:
+                if not any(math.hypot(p[0] - cp[0], p[1] - cp[1]) < 100.0 for cp in col_locations):
+                    col_locations.append(p)
+        elif walls:
+            # Derive from wall corners and endpoints
+            raw_pts = []
+            for w in walls:
+                w_start = getattr(w, "start", [0, 0]) if hasattr(w, "start") else w.get("start", [0, 0])
+                w_end = getattr(w, "end", [0, 0]) if hasattr(w, "end") else w.get("end", [0, 0])
+                raw_pts.append((float(w_start[0]), float(w_start[1])))
+                raw_pts.append((float(w_end[0]), float(w_end[1])))
+            for p in raw_pts:
+                if not any(math.hypot(p[0] - cp[0], p[1] - cp[1]) < 150.0 for cp in col_locations):
+                    col_locations.append(p)
+
+    # 2. Build level descriptors
+    sc = max(1, storeys_count)
+    levels_desc = []
+    curr_e = ground_elevation
+    for s_i in range(1, sc + 1):
+        levels_desc.append({
+            "id": f"level_{s_i}",
+            "name": f"Level {s_i}",
+            "elevation": curr_e,
+            "height": storey_height,
+            "storeyType": "ground" if s_i == 1 else "upper",
+        })
+        curr_e += storey_height
+    levels_desc.append({
+        "id": f"level_{sc + 1}",
+        "name": f"Level {sc + 1}",
+        "elevation": curr_e,
+        "height": 0.0,
+        "storeyType": "roof_datum",
+    })
+
+    # 3. Structural Grids
+    structural_grids = []
+    grid_intersections = None
+    if generate_grids and col_locations:
+        x_c = [p[0] for p in col_locations]
+        y_c = [p[1] for p in col_locations]
+        structural_grids = ParametricStructuralEngine.generate_orthogonal_grids_from_bounds(
+            x_c, y_c, margin=1500.0
+        )
+        grid_intersections = ParametricStructuralEngine.calculate_grid_intersections(structural_grids)
+
+    # 4. Columns
+    columns = []
+    if col_locations:
+        columns = ParametricStructuralEngine.generate_columns_at_locations(
+            locations=col_locations,
+            levels=levels_desc,
+            width=col_w,
+            depth=col_d,
+            profile=column_profile,
+            diameter=column_diameter,
+            grid_intersections=grid_intersections,
+            provenance="inferred" if eff_mode == "auto" else "user_configured",
+        )
+
+    # 5. Beams
+    beams = []
+    if columns:
+        beams = ParametricStructuralEngine.generate_beams_between_columns(
+            columns=columns,
+            levels=levels_desc,
+            width=bm_w,
+            depth=bm_d,
+            provenance="inferred" if eff_mode == "auto" else "user_configured",
+        )
+
+    # 6. Foundations
+    foundations = ParametricStructuralEngine.generate_foundations(
+        columns=columns,
+        walls=walls,
+        foundation_type=foundation_type,
+        pad_thickness=foundation_thickness,
+        pad_offset=-foundation_depth,
+        provenance="inferred" if eff_mode == "auto" else "user_configured",
+    )
+
+    # 7. Structural Slabs
+    floor_dicts = []
+    for fl in floors:
+        if isinstance(fl, dict):
+            floor_dicts.append(dict(fl))
+        else:
+            f_d = {
+                "id": fl.id,
+                "levelId": fl.level_id,
+                "thickness": fl.thickness,
+                "elevation": fl.elevation,
+                "boundary": fl.boundary,
+            }
+            if hasattr(fl, "openings") and fl.openings:
+                f_d["openings"] = fl.openings
+            floor_dicts.append(f_d)
+    classified_floors = ParametricStructuralEngine.classify_structural_slabs(floor_dicts, levels_desc)
+
+    return (
+        [g.to_dict() for g in structural_grids],
+        [c.to_dict() for c in columns],
+        [b.to_dict() for b in beams],
+        [f.to_dict() for f in foundations],
+        classified_floors,
+    )
+
+
 def reconstruct_dxf_model(
     dxf_path: Path | str,
     parsed: Any,
@@ -125,6 +291,16 @@ def reconstruct_dxf_model(
     stair_end: Optional[List[float]] = None,
     stair_railings: bool = True,
     stair_config_path: Optional[str] = None,
+    structure_mode: str = "none",
+    column_default: str = "300x300",
+    column_profile: str = "rectangular",
+    column_diameter: float = 350.0,
+    beam_default: str = "230x450",
+    foundation_type: str = "isolated",
+    foundation_thickness: float = 400.0,
+    foundation_depth: float = 1200.0,
+    generate_grids: bool = True,
+    structural_config_path: Optional[str] = None,
 ) -> IntermediateBimModel:
     """Reconstructs IntermediateBimModel from DXF supporting Mode A (layers) and Mode B (configured/repeated)."""
     if storeys < 1:
@@ -222,6 +398,26 @@ def reconstruct_dxf_model(
             if rf_geom:
                 roofs.append(rf_geom.to_dict())
 
+        struct_grids, cols, bms, fdns, updated_floors = _build_structural_elements(
+            parsed=parsed,
+            classifier=classifier,
+            walls=all_walls,
+            floors=all_floors,
+            storeys_count=storeys_effective,
+            storey_height=storey_height,
+            ground_elevation=ground_elevation,
+            structure_mode=structure_mode,
+            column_default=column_default,
+            column_profile=column_profile,
+            column_diameter=column_diameter,
+            beam_default=beam_default,
+            foundation_type=foundation_type,
+            foundation_thickness=foundation_thickness,
+            foundation_depth=foundation_depth,
+            generate_grids=generate_grids,
+            structural_config_path=structural_config_path,
+        )
+
         return IntermediateBimModel.create(
             project_name=Path(dxf_path).stem,
             source_dxf_path=str(Path(dxf_path).resolve()),
@@ -229,10 +425,14 @@ def reconstruct_dxf_model(
             scale_factor=scale_factor_to_mm,
             walls=all_walls,
             openings=all_openings,
-            floors=all_floors,
+            floors=updated_floors,
             rooms=all_rooms,
             roofs=roofs,
             assumptions=all_assumptions,
+            structural_grids=struct_grids,
+            columns=cols,
+            beams=bms,
+            foundations=fdns,
             storeys_count=storeys_effective,
             storey_heights=[storey_height] * storeys_effective,
             ground_elevation=ground_elevation,
@@ -376,6 +576,26 @@ def reconstruct_dxf_model(
             )
             staircases.append(st_geom.to_dict())
 
+    struct_grids, cols, bms, fdns, updated_floors = _build_structural_elements(
+        parsed=parsed,
+        classifier=classifier,
+        walls=walls,
+        floors=floors,
+        storeys_count=storeys,
+        storey_height=storey_height,
+        ground_elevation=ground_elevation,
+        structure_mode=structure_mode,
+        column_default=column_default,
+        column_profile=column_profile,
+        column_diameter=column_diameter,
+        beam_default=beam_default,
+        foundation_type=foundation_type,
+        foundation_thickness=foundation_thickness,
+        foundation_depth=foundation_depth,
+        generate_grids=generate_grids,
+        structural_config_path=structural_config_path,
+    )
+
     return IntermediateBimModel.create(
         project_name=Path(dxf_path).stem,
         source_dxf_path=str(Path(dxf_path).resolve()),
@@ -383,10 +603,14 @@ def reconstruct_dxf_model(
         scale_factor=scale_factor_to_mm,
         walls=walls,
         openings=openings,
-        floors=floors,
+        floors=updated_floors,
         rooms=rooms,
         roofs=roofs,
         staircases=staircases,
+        structural_grids=struct_grids,
+        columns=cols,
+        beams=bms,
+        foundations=fdns,
         assumptions=assumptions,
         storeys_count=storeys,
         storey_heights=[storey_height] * storeys,
@@ -416,6 +640,16 @@ def prepare(
     target_riser: float = typer.Option(175.0, "--target-riser", help="Target riser height in mm (default 175.0)"),
     target_going: float = typer.Option(280.0, "--target-going", help="Target going / tread depth in mm (default 280.0)"),
     stair_railings: bool = typer.Option(True, "--stair-railings/--no-stair-railings", help="Generate stair guardrails"),
+    structure: str = typer.Option("none", "--structure", help="Structural frame mode: none, auto, manual"),
+    column_default: str = typer.Option("300x300", "--column-default", help="Default column profile dimensions in mm (e.g. 300x300)"),
+    column_profile: str = typer.Option("rectangular", "--column-profile", help="Column profile: rectangular or circular"),
+    column_diameter: float = typer.Option(350.0, "--column-diameter", help="Circular column diameter in mm"),
+    beam_default: str = typer.Option("230x450", "--beam-default", help="Default beam cross-section in mm (e.g. 230x450)"),
+    foundation_type: str = typer.Option("isolated", "--foundation-type", help="Foundation type: isolated, strip, both"),
+    foundation_thickness: float = typer.Option(400.0, "--foundation-thickness", help="Foundation footing thickness in mm"),
+    foundation_depth: float = typer.Option(1200.0, "--foundation-depth", help="Footing bearing depth below ground in mm"),
+    generate_grids: bool = typer.Option(True, "--generate-grids/--no-generate-grids", help="Generate structural grid lines"),
+    structural_config: Optional[str] = typer.Option(None, "--structural-config", help="Path to structural configuration JSON"),
 ):
     """Parses DXF, reconstructs geometry, and creates an intermediate model awaiting approval."""
     if json_path and Path(json_path).exists():
@@ -448,6 +682,16 @@ def prepare(
             target_riser=target_riser,
             target_going=target_going,
             stair_railings=stair_railings,
+            structure_mode=structure,
+            column_default=column_default,
+            column_profile=column_profile,
+            column_diameter=column_diameter,
+            beam_default=beam_default,
+            foundation_type=foundation_type,
+            foundation_thickness=foundation_thickness,
+            foundation_depth=foundation_depth,
+            generate_grids=generate_grids,
+            structural_config_path=structural_config,
         )
 
     saved_path = model.save(output_path)
@@ -576,6 +820,16 @@ def run(
     target_going: float = typer.Option(280.0, "--target-going", help="Target going / tread depth in mm (default 280.0)"),
     stair_railings: bool = typer.Option(True, "--stair-railings/--no-stair-railings", help="Generate stair guardrails"),
     stair_config: Optional[str] = typer.Option(None, "--stair-config", help="Path to custom stair configuration JSON"),
+    structure: str = typer.Option("none", "--structure", help="Structural frame mode: none, auto, manual"),
+    column_default: str = typer.Option("300x300", "--column-default", help="Default column profile dimensions in mm (e.g. 300x300)"),
+    column_profile: str = typer.Option("rectangular", "--column-profile", help="Column profile: rectangular or circular"),
+    column_diameter: float = typer.Option(350.0, "--column-diameter", help="Circular column diameter in mm"),
+    beam_default: str = typer.Option("230x450", "--beam-default", help="Default beam cross-section in mm (e.g. 230x450)"),
+    foundation_type: str = typer.Option("isolated", "--foundation-type", help="Foundation type: isolated, strip, both"),
+    foundation_thickness: float = typer.Option(400.0, "--foundation-thickness", help="Foundation footing thickness in mm"),
+    foundation_depth: float = typer.Option(1200.0, "--foundation-depth", help="Footing bearing depth below ground in mm"),
+    generate_grids: bool = typer.Option(True, "--generate-grids/--no-generate-grids", help="Generate structural grid lines"),
+    structural_config: Optional[str] = typer.Option(None, "--structural-config", help="Path to structural configuration JSON"),
     non_interactive: bool = typer.Option(False, "--non-interactive", help="Run without terminal prompts (requires config or auto-approve)"),
     auto_approve: bool = typer.Option(False, "--auto-approve", help="Simulate human approval for automated headless testing"),
     views: bool = typer.Option(True, "--views/--no-views", help="Generate 3D isometric, elevation, and section views"),
@@ -701,6 +955,24 @@ def run(
         eff_target_going = cfg.stairs.target_going
         eff_stair_railings = cfg.stairs.railings
 
+    eff_structure_mode = structure
+    eff_column_default = column_default
+    eff_column_profile = column_profile
+    eff_column_diameter = column_diameter
+    eff_beam_default = beam_default
+    eff_foundation_type = foundation_type
+    eff_foundation_thickness = foundation_thickness
+    eff_foundation_depth = foundation_depth
+    eff_generate_grids = generate_grids
+    if eff_structure_mode == "none" and getattr(cfg, "structure", None) and cfg.structure.enabled:
+        eff_structure_mode = cfg.structure.mode or "auto"
+        eff_column_default = cfg.structure.column_default
+        eff_beam_default = cfg.structure.beam_default
+        eff_foundation_type = cfg.structure.foundation_type
+        eff_foundation_thickness = cfg.structure.foundation_thickness
+        eff_foundation_depth = cfg.structure.foundation_depth
+        eff_generate_grids = cfg.structure.generate_grids
+
     try:
         model = reconstruct_dxf_model(
             dxf_path=input_path,
@@ -725,6 +997,16 @@ def run(
             target_going=eff_target_going,
             stair_railings=eff_stair_railings,
             stair_config_path=stair_config or cfg.stairs.stair_config_path,
+            structure_mode=eff_structure_mode,
+            column_default=eff_column_default,
+            column_profile=eff_column_profile,
+            column_diameter=eff_column_diameter,
+            beam_default=eff_beam_default,
+            foundation_type=eff_foundation_type,
+            foundation_thickness=eff_foundation_thickness,
+            foundation_depth=eff_foundation_depth,
+            generate_grids=eff_generate_grids,
+            structural_config_path=structural_config,
         )
     except Exception as e:
         console.print(f"[bold red]Reconstruction error:[/bold red] {e}")
@@ -802,6 +1084,8 @@ def run(
         manifest.add_artifact("previews", "plan_preview", build_res.png_path, base_dir=out_base)
     if build_res.view_3d_path:
         manifest.add_artifact("previews", "view_3d", build_res.view_3d_path, base_dir=out_base)
+    if getattr(build_res, "view_frame_3d_path", None) and build_res.view_frame_3d_path.exists():
+        manifest.add_artifact("previews", "frame_3d", build_res.view_frame_3d_path, base_dir=out_base)
     if build_res.elevation_south_path:
         manifest.add_artifact("previews", "elevation_south", build_res.elevation_south_path, base_dir=out_base)
     if build_res.elevation_east_path:

@@ -109,4 +109,16 @@ class LayerClassifier:
     def is_stair_layer(self, layer_name: str) -> bool:
         return self.classify(layer_name) == "stair"
 
+    def is_column_layer(self, layer_name: str) -> bool:
+        return self.classify(layer_name) == "column"
+
+    def is_beam_layer(self, layer_name: str) -> bool:
+        return self.classify(layer_name) == "beam"
+
+    def is_grid_layer(self, layer_name: str) -> bool:
+        return self.classify(layer_name) == "grid"
+
+    def is_foundation_layer(self, layer_name: str) -> bool:
+        return self.classify(layer_name) == "foundation"
+
 

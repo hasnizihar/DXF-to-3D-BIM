@@ -145,6 +145,10 @@
               "maxItems": 2
             },
             "minItems": 3
+          },
+          "structuralRole": {
+            "type": "string",
+            "enum": ["architectural", "structural", "ground_bearing", "roof_slab"]
           }
         }
       }
@@ -274,6 +278,105 @@
             "minItems": 3
           },
           "provenance": { "type": "string", "enum": ["dxf_detected", "user_configured", "synthetic_test"] },
+          "confidence": { "type": "string", "enum": ["high", "medium", "low"] },
+          "approvalStatus": { "type": "string", "enum": ["pending", "approved", "rejected"] }
+        }
+      }
+    },
+    "structuralGrids": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "start", "end"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "start": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+          "end": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+          "orientation": { "type": "string", "enum": ["orthogonal", "rotated"] },
+          "provenance": { "type": "string", "enum": ["detected", "configured", "inferred"] }
+        }
+      }
+    },
+    "columns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "profile", "width", "depth", "at", "levelId", "topLevelId"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "profile": { "type": "string", "enum": ["rectangular", "circular"] },
+          "width": { "type": "number", "minimum": 100 },
+          "depth": { "type": "number", "minimum": 100 },
+          "diameter": { "type": "number", "minimum": 100 },
+          "at": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+          "angle": { "type": "number" },
+          "levelId": { "type": "string" },
+          "topLevelId": { "type": "string" },
+          "height": { "type": "number", "minimum": 500 },
+          "baseOffset": { "type": "number" },
+          "material": { "type": "string" },
+          "structuralRole": { "type": "string", "enum": ["load_bearing", "non_load_bearing"] },
+          "gridIntersection": { "type": "string" },
+          "sourceEntities": { "type": "array", "items": { "type": "string" } },
+          "provenance": { "type": "string", "enum": ["detected", "configured", "inferred", "synthetic_test"] },
+          "confidence": { "type": "string", "enum": ["high", "medium", "low"] },
+          "approvalStatus": { "type": "string", "enum": ["pending", "approved", "rejected"] }
+        }
+      }
+    },
+    "beams": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "width", "depth", "start", "end", "levelId"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "profile": { "type": "string", "enum": ["rectangular", "circular"] },
+          "width": { "type": "number", "minimum": 100 },
+          "depth": { "type": "number", "minimum": 100 },
+          "start": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+          "end": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+          "startColumnId": { "type": "string" },
+          "endColumnId": { "type": "string" },
+          "levelId": { "type": "string" },
+          "offset": { "type": "number" },
+          "endOffset": { "type": "number" },
+          "material": { "type": "string" },
+          "beamType": { "type": "string", "enum": ["primary", "secondary"] },
+          "sourceEntities": { "type": "array", "items": { "type": "string" } },
+          "provenance": { "type": "string", "enum": ["detected", "configured", "inferred", "synthetic_test"] },
+          "confidence": { "type": "string", "enum": ["high", "medium", "low"] },
+          "approvalStatus": { "type": "string", "enum": ["pending", "approved", "rejected"] }
+        }
+      }
+    },
+    "foundations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "foundationType", "width", "thickness", "levelId"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "foundationType": { "type": "string", "enum": ["isolated", "strip"] },
+          "at": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+          "points": {
+            "type": "array",
+            "items": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+            "minItems": 2
+          },
+          "width": { "type": "number", "minimum": 200 },
+          "depth": { "type": "number", "minimum": 200 },
+          "thickness": { "type": "number", "minimum": 100 },
+          "offset": { "type": "number" },
+          "angle": { "type": "number" },
+          "levelId": { "type": "string" },
+          "supportingElementId": { "type": "string" },
+          "material": { "type": "string" },
+          "provenance": { "type": "string", "enum": ["detected", "configured", "inferred", "synthetic_test"] },
           "confidence": { "type": "string", "enum": ["high", "medium", "low"] },
           "approvalStatus": { "type": "string", "enum": ["pending", "approved", "rejected"] }
         }

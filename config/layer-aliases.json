@@ -32,8 +32,20 @@
       "patterns": [".*SLAB.*", ".*FLOR.*"]
     },
     "column": {
-      "exact": ["S-COLS", "A-COLS", "COLUMN", "COLUMNS", "STRUCT_COL"],
+      "exact": ["S-COLS", "A-COLS", "COLUMN", "COLUMNS", "STRUCT_COL", "COL"],
       "patterns": [".*COL.*"]
+    },
+    "beam": {
+      "exact": ["S-BEAM", "BEAM", "BEAMS", "STRUCT_BEAM", "GIRDER", "S-FRAM"],
+      "patterns": [".*BEAM.*", ".*GIRDER.*", ".*FRAM.*"]
+    },
+    "grid": {
+      "exact": ["S-GRID", "A-GRID", "GRID", "GRIDS", "AXIS", "AXES", "A-ANNO-GRID"],
+      "patterns": [".*GRID.*", ".*AXIS.*"]
+    },
+    "foundation": {
+      "exact": ["S-FNDN", "FOOTING", "FOOTINGS", "FOUNDATION", "S-FOOT", "PAD", "PAD_FOOTING"],
+      "patterns": [".*FNDN.*", ".*FOOT.*", ".*FOUND.*", ".*PAD.*"]
     },
     "annotation_text": {
       "exact": ["A-ANNO-TEXT", "TEXT", "ROOM_NAMES", "ANNOTATION", "A-TEXT"],

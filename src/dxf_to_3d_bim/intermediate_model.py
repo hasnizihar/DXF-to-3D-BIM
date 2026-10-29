@@ -37,6 +37,10 @@ class IntermediateBimModel:
         levels_override: Optional[List[Dict[str, Any]]] = None,
         roofs: Optional[List[Dict[str, Any]]] = None,
         staircases: Optional[List[Dict[str, Any]]] = None,
+        structural_grids: Optional[List[Dict[str, Any]]] = None,
+        columns: Optional[List[Dict[str, Any]]] = None,
+        beams: Optional[List[Dict[str, Any]]] = None,
+        foundations: Optional[List[Dict[str, Any]]] = None,
     ) -> "IntermediateBimModel":
         now_iso = datetime.now(timezone.utc).isoformat()
 
@@ -81,16 +85,22 @@ class IntermediateBimModel:
         floor_dicts = []
         for fl in floors:
             f_item = {
-                "id": fl.id,
-                "levelId": fl.level_id,
-                "thickness": fl.thickness,
-                "elevation": fl.elevation,
-                "boundary": [[p[0], p[1]] for p in fl.boundary],
+                "id": fl.id if hasattr(fl, "id") else fl.get("id"),
+                "levelId": fl.level_id if hasattr(fl, "level_id") else fl.get("levelId", "Level 1"),
+                "thickness": fl.thickness if hasattr(fl, "thickness") else fl.get("thickness", 150.0),
+                "elevation": fl.elevation if hasattr(fl, "elevation") else fl.get("elevation", 0.0),
+                "boundary": [[p[0], p[1]] for p in (fl.boundary if hasattr(fl, "boundary") else fl.get("boundary", []))],
             }
             if hasattr(fl, "openings") and fl.openings:
                 f_item["openings"] = [[[p[0], p[1]] for p in op] for op in fl.openings]
             elif isinstance(fl, dict) and fl.get("openings"):
                 f_item["openings"] = fl.get("openings")
+            if hasattr(fl, "structural_role") and fl.structural_role:
+                f_item["structuralRole"] = fl.structural_role
+            elif hasattr(fl, "structuralRole") and fl.structuralRole:
+                f_item["structuralRole"] = fl.structuralRole
+            elif isinstance(fl, dict) and fl.get("structuralRole"):
+                f_item["structuralRole"] = fl.get("structuralRole")
             floor_dicts.append(f_item)
 
         # Build room dicts
@@ -269,6 +279,10 @@ class IntermediateBimModel:
             "rooms": room_dicts,
             "roofs": roofs if roofs is not None else [],
             "staircases": staircases if staircases is not None else [],
+            "structuralGrids": structural_grids if structural_grids is not None else [],
+            "columns": columns if columns is not None else [],
+            "beams": beams if beams is not None else [],
+            "foundations": foundations if foundations is not None else [],
             "assumptions": assumptions or [],
             "approval": {
                 "isApproved": False,
@@ -371,6 +385,10 @@ class IntermediateBimModel:
             "rooms": rooms,
             "roofs": [],
             "staircases": [],
+            "structuralGrids": [],
+            "columns": [],
+            "beams": [],
+            "foundations": [],
             "assumptions": upstream.get("uncertainties", []),
             "approval": {
                 "isApproved": False,
@@ -414,6 +432,9 @@ class IntermediateBimModel:
         floors = self.data.get("floors", [])
         roofs = self.data.get("roofs", [])
         staircases = self.data.get("staircases", [])
+        columns = self.data.get("columns", [])
+        beams = self.data.get("beams", [])
+        foundations = self.data.get("foundations", [])
 
         for lvl in self.data.get("levels", []):
             lname = lvl.get("name")
@@ -423,6 +444,9 @@ class IntermediateBimModel:
             lvl_fls = [fl for fl in floors if fl.get("levelId") in (lname, lid)]
             lvl_roofs = [r for r in roofs if r.get("levelId") in (lname, lid)]
             lvl_stairs = [st for st in staircases if st.get("levelId") in (lname, lid)]
+            lvl_cols = [c for c in columns if c.get("levelId") in (lname, lid)]
+            lvl_beams = [b for b in beams if b.get("levelId") in (lname, lid)]
+            lvl_foundations = [f for f in foundations if f.get("levelId") in (lname, lid)]
             summary.append({
                 "id": lid,
                 "name": lname,
@@ -434,6 +458,9 @@ class IntermediateBimModel:
                 "floors": len(lvl_fls),
                 "roofs": len(lvl_roofs),
                 "stairs": len(lvl_stairs),
+                "columns": len(lvl_cols),
+                "beams": len(lvl_beams),
+                "foundations": len(lvl_foundations),
             })
         return summary
 

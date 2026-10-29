@@ -82,6 +82,20 @@
         "stair_config_path": { "type": "string" }
       }
     },
+    "structure": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "mode": { "type": "string", "enum": ["none", "auto", "manual"] },
+        "structural_config_path": { "type": "string" },
+        "column_default": { "type": "string" },
+        "beam_default": { "type": "string" },
+        "foundation_type": { "type": "string", "enum": ["isolated", "strip", "none"] },
+        "foundation_thickness": { "type": "number", "minimum": 100 },
+        "foundation_depth": { "type": "number", "minimum": 200 },
+        "generate_grids": { "type": "boolean" }
+      }
+    },
     "tolerances": {
       "type": "object",
       "properties": {

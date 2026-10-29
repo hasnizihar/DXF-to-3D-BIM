@@ -36,7 +36,12 @@
             "roofs": { "type": "integer" },
             "stairs": { "type": "integer" },
             "stair_flights": { "type": "integer" },
-            "railings": { "type": "integer" }
+            "railings": { "type": "integer" },
+            "grids": { "type": "integer" },
+            "columns": { "type": "integer" },
+            "beams": { "type": "integer" },
+            "foundations": { "type": "integer" },
+            "structural_slabs": { "type": "integer" }
           }
         },
         "generated": {
@@ -49,7 +54,12 @@
             "roofs": { "type": "integer" },
             "stairs": { "type": "integer" },
             "stair_flights": { "type": "integer" },
-            "railings": { "type": "integer" }
+            "railings": { "type": "integer" },
+            "grids": { "type": "integer" },
+            "columns": { "type": "integer" },
+            "beams": { "type": "integer" },
+            "foundations": { "type": "integer" },
+            "structural_slabs": { "type": "integer" }
           }
         }
       }

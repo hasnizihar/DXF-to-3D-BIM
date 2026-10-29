@@ -36,7 +36,15 @@
         "riserCount": { "type": "integer" },
         "riserHeight": { "type": "number" },
         "going": { "type": "number" },
-        "stairwellOpeningM2": { "type": "number" }
+        "stairwellOpeningM2": { "type": "number" },
+        "gridCount": { "type": "integer" },
+        "columnCount": { "type": "integer" },
+        "beamCount": { "type": "integer" },
+        "foundationCount": { "type": "integer" },
+        "structuralSlabCount": { "type": "integer" },
+        "columnDefault": { "type": "string" },
+        "beamDefault": { "type": "string" },
+        "foundationType": { "type": "string" }
       }
     },
     "notes": { "type": "string" }

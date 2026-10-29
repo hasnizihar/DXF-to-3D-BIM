@@ -43,6 +43,15 @@ class ArcEntity:
 
 
 @dataclass
+class CircleEntity:
+    id: str
+    layer: str
+    center: Tuple[float, float]
+    radius: float
+    source_type: str = "CIRCLE"
+
+
+@dataclass
 class TextEntity:
     id: str
     layer: str
@@ -70,6 +79,7 @@ class ParsedDxfData:
     report: DxfInspectionReport
     lines: List[LineSegment] = field(default_factory=list)
     arcs: List[ArcEntity] = field(default_factory=list)
+    circles: List[CircleEntity] = field(default_factory=list)
     texts: List[TextEntity] = field(default_factory=list)
 
 
@@ -161,6 +171,7 @@ class DxfParser:
 
         lines: List[LineSegment] = []
         arcs: List[ArcEntity] = []
+        circles: List[CircleEntity] = []
         texts: List[TextEntity] = []
 
         counter = 0
@@ -225,6 +236,18 @@ class DxfParser:
                     )
                 )
 
+            elif etype == "CIRCLE":
+                c = converter.point_to_mm((entity.dxf.center.x, entity.dxf.center.y))
+                r = converter.to_mm(entity.dxf.radius)
+                circles.append(
+                    CircleEntity(
+                        id=handle,
+                        layer=layer,
+                        center=c,
+                        radius=round(r, 2),
+                    )
+                )
+
             elif etype in ("TEXT", "MTEXT"):
                 txt = entity.dxf.text if etype == "TEXT" else entity.text
                 pos = converter.point_to_mm((entity.dxf.insert.x, entity.dxf.insert.y))
@@ -257,5 +280,5 @@ class DxfParser:
                                 )
                             )
 
-        return ParsedDxfData(report=report, lines=lines, arcs=arcs, texts=texts)
+        return ParsedDxfData(report=report, lines=lines, arcs=arcs, circles=circles, texts=texts)
 

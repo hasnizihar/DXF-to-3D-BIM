@@ -50,6 +50,11 @@ class ApprovalGate:
         floors = d.get("floors", [])
         roofs = d.get("roofs", [])
         staircases = d.get("staircases", [])
+        structural_grids = d.get("structuralGrids", [])
+        columns = d.get("columns", [])
+        beams = d.get("beams", [])
+        foundations = d.get("foundations", [])
+        structural_slabs = [fl for fl in floors if fl.get("structuralRole") in ("structural", "ground_bearing", "roof_slab")]
         assumptions = d.get("assumptions", [])
 
         ext_walls = [w for w in walls if w.get("classification") == "exterior"]
@@ -94,6 +99,21 @@ class ApprovalGate:
             vert_params["stair_riser_height_mm"] = s0.get("actualRiserHeight", 176.5)
             vert_params["stair_going_mm"] = s0.get("actualGoing", 280.0)
             vert_params["stairwell_opening_m2"] = s0.get("stairwellAreaM2", 0.0)
+        if structural_grids or columns or beams or foundations:
+            vert_params["grid_count"] = len(structural_grids)
+            vert_params["column_count"] = len(columns)
+            vert_params["beam_count"] = len(beams)
+            vert_params["foundation_count"] = len(foundations)
+            vert_params["structural_slab_count"] = len(structural_slabs)
+            if columns:
+                c0 = columns[0]
+                vert_params["column_default"] = f"{int(c0.get('width', 300))}x{int(c0.get('depth', 300))}"
+            if beams:
+                b0 = beams[0]
+                vert_params["beam_default"] = f"{int(b0.get('width', 230))}x{int(b0.get('depth', 450))}"
+            if foundations:
+                f0 = foundations[0]
+                vert_params["foundation_type"] = f0.get("foundationType", "isolated")
 
         return {
             "projectName": d.get("metadata", {}).get("projectName", "Project"),
@@ -111,6 +131,10 @@ class ApprovalGate:
                 "floors": len(floors),
                 "roofs": len(roofs),
                 "staircases": len(staircases),
+                "structural_grids": len(structural_grids),
+                "columns": len(columns),
+                "beams": len(beams),
+                "foundations": len(foundations),
             },
             "proposed_vertical_parameters": vert_params,
             "uncertainties": assumptions,
@@ -169,6 +193,22 @@ class ApprovalGate:
             approved_params["riserHeight"] = vert["stair_riser_height_mm"]
             approved_params["going"] = vert["stair_going_mm"]
             approved_params["stairwellOpeningM2"] = vert["stairwell_opening_m2"]
+        if "grid_count" in vert:
+            approved_params["gridCount"] = vert["grid_count"]
+        if "column_count" in vert:
+            approved_params["columnCount"] = vert["column_count"]
+        if "beam_count" in vert:
+            approved_params["beamCount"] = vert["beam_count"]
+        if "foundation_count" in vert:
+            approved_params["foundationCount"] = vert["foundation_count"]
+        if "structural_slab_count" in vert:
+            approved_params["structuralSlabCount"] = vert["structural_slab_count"]
+        if "column_default" in vert:
+            approved_params["columnDefault"] = vert["column_default"]
+        if "beam_default" in vert:
+            approved_params["beamDefault"] = vert["beam_default"]
+        if "foundation_type" in vert:
+            approved_params["foundationType"] = vert["foundation_type"]
 
         approval_record: Dict[str, Any] = {
             "projectName": model.data.get("metadata", {}).get("projectName", "Project"),

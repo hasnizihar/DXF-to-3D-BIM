@@ -17,6 +17,7 @@ class BimcraftBuildResult:
     ifc_path: Optional[Path] = None
     png_path: Optional[Path] = None
     view_3d_path: Optional[Path] = None
+    view_frame_3d_path: Optional[Path] = None
     elevation_south_path: Optional[Path] = None
     elevation_east_path: Optional[Path] = None
     section_path: Optional[Path] = None
@@ -78,6 +79,104 @@ class BimcraftAdapter:
                     "elevation": float(lvl.get("elevation", 0.0)),
                 }))
 
+        # 0a. Structural Grids
+        for g in d.get("structuralGrids", []):
+            cmds.append(("grid", {
+                "start": [float(g["start"][0]), float(g["start"][1])],
+                "end": [float(g["end"][0]), float(g["end"][1])],
+                "name": str(g.get("name", "")),
+            }))
+
+        # 0b. Custom Component Types (Columns, Beams, Footings)
+        col_types_defined = set()
+        for col in d.get("columns", []):
+            profile = col.get("profile", "rectangular")
+            w = float(col.get("width", 300.0))
+            h = float(col.get("depth", 300.0))
+            is_round = (profile == "circular")
+            type_name = f"C_{int(w)}x{int(h)}" if not is_round else f"C_Round_{int(col.get('diameter', w))}"
+            if type_name not in col_types_defined:
+                type_params = {
+                    "category": "structuralcolumn",
+                    "name": type_name,
+                    "width": col.get("diameter", w) if is_round else w,
+                    "depth": col.get("diameter", h) if is_round else h,
+                }
+                if is_round:
+                    type_params["round"] = True
+                cmds.append(("type", type_params))
+                col_types_defined.add(type_name)
+
+        beam_types_defined = set()
+        for bm in d.get("beams", []):
+            w = float(bm.get("width", 230.0))
+            h = float(bm.get("depth", 450.0))
+            type_name = f"B_{int(w)}x{int(h)}"
+            if type_name not in beam_types_defined:
+                cmds.append(("type", {
+                    "category": "beam",
+                    "name": type_name,
+                    "width": w,
+                    "depth": h,
+                }))
+                beam_types_defined.add(type_name)
+
+        ftg_types_defined = set()
+        for ft in d.get("foundations", []):
+            ft_type = ft.get("foundationType", "isolated")
+            if ft_type == "isolated":
+                w = float(ft.get("width", 1200.0))
+                d_val = float(ft.get("depth", 1200.0))
+                type_name = f"F_{int(w)}x{int(d_val)}"
+                if type_name not in ftg_types_defined:
+                    cmds.append(("type", {
+                        "category": "footing",
+                        "name": type_name,
+                        "width": w,
+                        "depth": d_val,
+                    }))
+                    ftg_types_defined.add(type_name)
+            elif ft_type == "strip":
+                w = float(ft.get("width", 600.0))
+                th = float(ft.get("thickness", 300.0))
+                type_name = f"SF_{int(w)}x{int(th)}"
+                if type_name not in ftg_types_defined:
+                    cmds.append(("type", {
+                        "category": "stripfooting",
+                        "name": type_name,
+                        "width": w,
+                        "depth": th,
+                    }))
+                    ftg_types_defined.add(type_name)
+
+        # 0c. Foundations (Placed before walls/columns)
+        for ft in d.get("foundations", []):
+            ft_type = ft.get("foundationType", "isolated")
+            if ft_type == "isolated" and ft.get("at"):
+                w = float(ft.get("width", 1200.0))
+                d_val = float(ft.get("depth", 1200.0))
+                tname = f"F_{int(w)}x{int(d_val)}"
+                ft_params = {
+                    "at": [float(ft["at"][0]), float(ft["at"][1])],
+                    "type": tname,
+                    "thickness": float(ft.get("thickness", 400.0)),
+                    "level": ft.get("levelId", "Level 1"),
+                }
+                if "offset" in ft:
+                    ft_params["offset"] = float(ft["offset"])
+                if "angle" in ft and abs(float(ft["angle"])) > 1e-4:
+                    ft_params["angle"] = float(ft["angle"])
+                cmds.append(("footing", ft_params))
+            elif ft_type == "strip" and ft.get("points"):
+                w = float(ft.get("width", 600.0))
+                th = float(ft.get("thickness", 300.0))
+                tname = f"SF_{int(w)}x{int(th)}"
+                cmds.append(("strip_footing", {
+                    "points": [[float(p[0]), float(p[1])] for p in ft["points"]],
+                    "type": tname,
+                    "level": ft.get("levelId", "Level 1"),
+                }))
+
         # 1. Walls
         for w in d.get("walls", []):
             wall_params = {
@@ -94,6 +193,8 @@ class BimcraftAdapter:
                 "boundary": fl["boundary"],
                 "level": fl.get("levelId", "Level 1"),
             }
+            if fl.get("structuralRole") in ("structural", "ground_bearing", "roof_slab") or fl.get("structural"):
+                floor_params["structural"] = True
             if "openings" in fl and fl["openings"]:
                 floor_params["openings"] = fl["openings"]
             cmds.append(("floor", floor_params))
@@ -171,6 +272,47 @@ class BimcraftAdapter:
                 ]
             cmds.append(("stair", stair_params))
 
+        # 5c. Structural Columns
+        for col in d.get("columns", []):
+            profile = col.get("profile", "rectangular")
+            w = float(col.get("width", 300.0))
+            h = float(col.get("depth", 300.0))
+            is_round = (profile == "circular")
+            type_name = f"C_{int(w)}x{int(h)}" if not is_round else f"C_Round_{int(col.get('diameter', w))}"
+            col_params: Dict[str, Any] = {
+                "at": [float(col["at"][0]), float(col["at"][1])],
+                "type": type_name,
+                "level": col.get("levelId", "Level 1"),
+                "top_level": col.get("topLevelId", "Level 2"),
+            }
+            if "angle" in col and abs(float(col["angle"])) > 1e-4:
+                col_params["angle"] = float(col["angle"])
+            if "height" in col and col["height"] is not None:
+                col_params["height"] = float(col["height"])
+            if "baseOffset" in col and abs(float(col["baseOffset"])) > 1e-4:
+                col_params["base_offset"] = float(col["baseOffset"])
+            cmds.append(("structural_column", col_params))
+
+        # 5d. Structural Beams
+        for bm in d.get("beams", []):
+            w = float(bm.get("width", 230.0))
+            h = float(bm.get("depth", 450.0))
+            type_name = f"B_{int(w)}x{int(h)}"
+            beam_params: Dict[str, Any] = {
+                "points": [
+                    [float(bm["start"][0]), float(bm["start"][1])],
+                    [float(bm["end"][0]), float(bm["end"][1])],
+                ],
+                "type": type_name,
+                "level": bm.get("levelId", "Level 2"),
+                "justify": "top",
+            }
+            if "offset" in bm and abs(float(bm["offset"])) > 1e-4:
+                beam_params["offset"] = float(bm["offset"])
+            if "endOffset" in bm and abs(float(bm["endOffset"])) > 1e-4:
+                beam_params["end_offset"] = float(bm["endOffset"])
+            cmds.append(("beam", beam_params))
+
         # 6. Visual Views & Renderings (if configured)
         if views_config:
             # Elevation views
@@ -200,6 +342,15 @@ class BimcraftAdapter:
                     "azimuth": 315,
                     "elevation": 30,
                     "path": str(views_config["view_3d"]),
+                }))
+
+            # Structural Frame 3D Axonometric view
+            if "view_frame_3d" in views_config:
+                cmds.append(("render", {
+                    "view": "{3D}",
+                    "azimuth": 225,
+                    "elevation": 35,
+                    "path": str(views_config["view_frame_3d"]),
                 }))
 
             # Upper floor level plans
@@ -248,6 +399,8 @@ class BimcraftAdapter:
         level_plan_paths: Dict[str, Path] = {}
         if generate_3d_views:
             views_config["view_3d"] = p_dir / f"{base_name}_3d.png"
+            if model.data.get("columns") or model.data.get("beams"):
+                views_config["view_frame_3d"] = p_dir / f"{base_name}_frame_3d.png"
             views_config["elevation_south"] = p_dir / f"{base_name}_elev_south.png"
             views_config["elevation_east"] = p_dir / f"{base_name}_elev_east.png"
             views_config["section"] = p_dir / f"{base_name}_section_a.png"
@@ -303,6 +456,7 @@ class BimcraftAdapter:
             ifc_path=ifc_file,
             png_path=png_file,
             view_3d_path=views_config.get("view_3d"),
+            view_frame_3d_path=views_config.get("view_frame_3d"),
             elevation_south_path=views_config.get("elevation_south"),
             elevation_east_path=views_config.get("elevation_east"),
             section_path=views_config.get("section"),

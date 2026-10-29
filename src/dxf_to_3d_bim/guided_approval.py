@@ -155,6 +155,29 @@ class GuidedApprovalSession:
                 t_stair.add_row("Intermediate Landings", l_desc)
             self.console.print(t_stair)
 
+        # Section 5d: Structural BIM Frame & Foundations (if configured)
+        cols = self.model.data.get("columns", [])
+        beams = self.model.data.get("beams", [])
+        grids = self.model.data.get("structuralGrids", [])
+        ftgs = self.model.data.get("foundations", [])
+        if cols or beams or grids or ftgs:
+            t_struct = Table(title="Section 5d: Structural BIM Frame & Foundations")
+            t_struct.add_column("Parameter", style="cyan")
+            t_struct.add_column("Approved Specification", style="green")
+            t_struct.add_row(
+                "Structural Grids",
+                f"{len(grids)} axes ({', '.join(g.get('name', '') for g in grids[:6])}{'...' if len(grids) > 6 else ''})"
+            )
+            if cols:
+                c_prof = cols[0].get("profile", "rectangular")
+                t_struct.add_row("RC Columns", f"{len(cols)} columns ({c_prof} {cols[0].get('width')}x{cols[0].get('depth')} mm)")
+            if beams:
+                t_struct.add_row("RC Beams", f"{len(beams)} primary beams ({beams[0].get('width')}x{beams[0].get('depth')} mm)")
+            if ftgs:
+                t_struct.add_row("Foundations", f"{len(ftgs)} {ftgs[0].get('foundationType')} footings (thickness {ftgs[0].get('thickness')} mm)")
+            t_struct.add_row("Engineering Disclaimer", "Spatial BIM coordination model only. Not for licensed structural calculation.")
+            self.console.print(t_struct)
+
         # Section 6: Warnings & Uncertainties
         t6 = Table(title="Section 6: Uncertain Geometry & Preflight Warnings")
         t6.add_column("Item", style="yellow")

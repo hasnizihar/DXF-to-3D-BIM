@@ -94,6 +94,18 @@ class StairsConfig(BaseModel):
     stair_config_path: Optional[str] = None
 
 
+class StructureConfig(BaseModel):
+    enabled: bool = False
+    mode: str = "none"  # "none", "auto", "manual"
+    structural_config_path: Optional[str] = None
+    column_default: str = "300x300"
+    beam_default: str = "230x450"
+    foundation_type: str = "isolated"  # "isolated", "strip", "none"
+    foundation_thickness: float = 400.0
+    foundation_depth: float = 1200.0
+    generate_grids: bool = True
+
+
 class TolerancesConfig(BaseModel):
     endpoint_snap: float = 25.0
     collinear_distance: float = 5.0

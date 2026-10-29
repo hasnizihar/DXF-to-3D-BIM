@@ -143,6 +143,9 @@ class IfcSemanticInspection:
     stairs: List[Dict[str, Any]] = field(default_factory=list)
     stair_flights: List[Dict[str, Any]] = field(default_factory=list)
     railings: List[Dict[str, Any]] = field(default_factory=list)
+    columns: List[Dict[str, Any]] = field(default_factory=list)
+    beams: List[Dict[str, Any]] = field(default_factory=list)
+    foundations: List[Dict[str, Any]] = field(default_factory=list)
     voids_verified: bool = False
     fills_verified: bool = False
     containment_verified: bool = False
@@ -224,6 +227,9 @@ class PureIfcParser:
         stair_entities = self.get_entities_by_type("IFCSTAIR")
         flight_entities = self.get_entities_by_type("IFCSTAIRFLIGHT")
         railing_entities = self.get_entities_by_type("IFCRAILING")
+        column_entities = self.get_entities_by_type("IFCCOLUMN")
+        beam_entities = self.get_entities_by_type("IFCBEAM")
+        footing_entities = self.get_entities_by_type("IFCFOOTING")
         void_profile_entities = self.get_entities_by_type("IFCARBITRARYPROFILEDEFWITHVOIDS")
         opening_entities = self.get_entities_by_type("IFCOPENINGELEMENT")
         storey_entities = self.get_entities_by_type("IFCBUILDINGSTOREY")
@@ -237,6 +243,9 @@ class PureIfcParser:
             "stair": len(stair_entities),
             "stair_flight": len(flight_entities),
             "railing": len(railing_entities),
+            "column": len(column_entities),
+            "beam": len(beam_entities),
+            "footing": len(footing_entities),
             "opening_element": len(opening_entities),
             "storey": len(storey_entities),
         }
@@ -271,7 +280,20 @@ class PureIfcParser:
                 if structure_id:
                     contained_by_storey[structure_id] = elem_ids
 
-        all_primary_ids = {e.id for e in (wall_entities + door_entities + window_entities + slab_entities + roof_entities + stair_entities)}
+        all_primary_ids = {
+            e.id
+            for e in (
+                wall_entities
+                + door_entities
+                + window_entities
+                + slab_entities
+                + roof_entities
+                + stair_entities
+                + column_entities
+                + beam_entities
+                + footing_entities
+            )
+        }
         containment_verified = all_primary_ids.issubset(contained_element_ids) if all_primary_ids else True
         if containment_verified and all_primary_ids:
             details.append(f"Spatial containment verified: All {len(all_primary_ids)} primary building elements are linked to building storeys.")
@@ -456,6 +478,42 @@ class PureIfcParser:
                 "predefined_type": predef_str,
             })
 
+        # Columns
+        parsed_columns = []
+        for c in column_entities:
+            # IFCCOLUMN: (GlobalId, OwnerHistory, Name, Description, ObjectType, ObjectPlacement, Representation, Tag, PredefinedType)
+            c_name = c.args[2] if len(c.args) > 2 and isinstance(c.args[2], str) else "Column"
+            c_predef = str(c.args[8]).strip(".") if len(c.args) > 8 and c.args[8] else "COLUMN"
+            parsed_columns.append({
+                "id": c.id,
+                "name": c_name,
+                "predefined_type": c_predef,
+            })
+
+        # Beams
+        parsed_beams = []
+        for b in beam_entities:
+            # IFCBEAM: (GlobalId, OwnerHistory, Name, Description, ObjectType, ObjectPlacement, Representation, Tag, PredefinedType)
+            b_name = b.args[2] if len(b.args) > 2 and isinstance(b.args[2], str) else "Beam"
+            b_predef = str(b.args[8]).strip(".") if len(b.args) > 8 and b.args[8] else "BEAM"
+            parsed_beams.append({
+                "id": b.id,
+                "name": b_name,
+                "predefined_type": b_predef,
+            })
+
+        # Footings
+        parsed_footings = []
+        for ft in footing_entities:
+            # IFCFOOTING: (GlobalId, OwnerHistory, Name, Description, ObjectType, ObjectPlacement, Representation, Tag, PredefinedType)
+            ft_name = ft.args[2] if len(ft.args) > 2 and isinstance(ft.args[2], str) else "Footing"
+            ft_predef = str(ft.args[8]).strip(".") if len(ft.args) > 8 and ft.args[8] else "FOOTING"
+            parsed_footings.append({
+                "id": ft.id,
+                "name": ft_name,
+                "predefined_type": ft_predef,
+            })
+
         has_slab_voids = len(void_profile_entities) > 0
         if has_slab_voids:
             details.append(
@@ -474,6 +532,9 @@ class PureIfcParser:
             stairs=stairs,
             stair_flights=flights,
             railings=railings,
+            columns=parsed_columns,
+            beams=parsed_beams,
+            foundations=parsed_footings,
             voids_verified=voids_verified,
             fills_verified=fills_verified,
             containment_verified=containment_verified,
