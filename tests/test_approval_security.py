@@ -60,3 +60,4 @@ def test_adapter_refuses_unapproved_or_tampered_model(tmp_path):
     with pytest.raises(PermissionError) as exc_info:
         adapter.execute_build(model, output_dir=tmp_path)
     assert "changed since approval" in str(exc_info.value)
+

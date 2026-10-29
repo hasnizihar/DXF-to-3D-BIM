@@ -26,3 +26,4 @@ def test_missing_bimcraft_cli_path(tmp_path):
     with pytest.raises(FileNotFoundError) as exc_info:
         adapter.execute_build(model, output_dir=tmp_path)
     assert "BIMCraft CLI executable not found" in str(exc_info.value)
+

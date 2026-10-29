@@ -43,3 +43,4 @@ def test_rotated_geometry():
     walls = rec.reconstruct([l1, l2])
     assert len(walls) == 1
     assert pytest.approx(walls[0].thickness, 1.0) == 200.0
+

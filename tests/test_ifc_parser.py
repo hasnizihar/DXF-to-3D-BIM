@@ -34,3 +34,4 @@ def test_ifc_parser_on_sample_fixture():
     assert window["width"] == 1200.0
     assert window["height"] == 1500.0
     assert window["host_wall"] is not None
+
