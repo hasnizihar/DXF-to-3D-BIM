@@ -223,3 +223,4 @@ class SourceToBimComparator:
 
         img.save(str(output_path), format="PNG")
         return output_path
+

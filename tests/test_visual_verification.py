@@ -63,3 +63,4 @@ def test_3d_views_and_elevations_generation(tmp_path):
     md = ReviewSummaryGenerator.generate_markdown(model, val_report, build_result=res)
     assert "# BIM Review & Visual Verification Summary" in md
     assert "3D Axonometric Render:" in md
+

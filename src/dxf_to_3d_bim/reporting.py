@@ -121,3 +121,4 @@ class ReviewSummaryGenerator:
         md.append("")
 
         return "\n".join(md)
+
