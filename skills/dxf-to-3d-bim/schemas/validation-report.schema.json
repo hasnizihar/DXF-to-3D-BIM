@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BIMValidationReport",
+  "description": "Validation results checking consistency between DXF source, intermediate model, BIMCraft project, and IFC output",
+  "type": "object",
+  "required": ["timestamp", "projectName", "overallStatus", "checks", "elementSummary"],
+  "properties": {
+    "timestamp": { "type": "string" },
+    "projectName": { "type": "string" },
+    "overallStatus": { "type": "string", "enum": ["PASSED", "WARNING", "FAILED"] },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["category", "name", "status", "details"],
+        "properties": {
+          "category": { "type": "string" },
+          "name": { "type": "string" },
+          "status": { "type": "string", "enum": ["PASSED", "WARNING", "FAILED", "UNVERIFIED"] },
+          "details": { "type": "string" },
+          "numericalDifference": { "type": "number" }
+        }
+      }
+    },
+    "elementSummary": {
+      "type": "object",
+      "required": ["expected", "generated"],
+      "properties": {
+        "expected": {
+          "type": "object",
+          "properties": {
+            "walls": { "type": "integer" },
+            "doors": { "type": "integer" },
+            "windows": { "type": "integer" },
+            "levels": { "type": "integer" }
+          }
+        },
+        "generated": {
+          "type": "object",
+          "properties": {
+            "walls": { "type": "integer" },
+            "doors": { "type": "integer" },
+            "windows": { "type": "integer" },
+            "levels": { "type": "integer" }
+          }
+        }
+      }
+    },
+    "deliverables": {
+      "type": "object",
+      "properties": {
+        "bimcraftPath": { "type": "string" },
+        "ifcPath": { "type": "string" },
+        "previewPngPath": { "type": "string" }
+      }
+    }
+  }
+}

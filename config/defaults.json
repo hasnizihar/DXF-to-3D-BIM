@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "version": "1.0.0",
+  "bimcraft": {
+    "cli_path": "C:\\Program Files\\BIMCraft\\bimcraft-cli.exe",
+    "gui_path": "C:\\Program Files\\BIMCraft\\bimcraft.exe",
+    "timeout_seconds": 60,
+    "default_format": "IFC4"
+  },
+  "units": {
+    "internal": "mm",
+    "dxf_default_if_unspecified": "mm"
+  },
+  "levels": {
+    "default_storeys": 1,
+    "ground_floor_elevation": 0.0,
+    "floor_to_floor_height": 3000.0,
+    "level_names": ["Level 1", "Level 2"]
+  },
+  "walls": {
+    "exterior_thickness": 200.0,
+    "interior_thickness": 100.0,
+    "height": 3000.0
+  },
+  "openings": {
+    "door": {
+      "width": 900.0,
+      "height": 2100.0
+    },
+    "window": {
+      "width": 1200.0,
+      "height": 1200.0,
+      "sill_height": 900.0
+    }
+  },
+  "slab": {
+    "thickness": 150.0,
+    "elevation": 0.0
+  }
+}

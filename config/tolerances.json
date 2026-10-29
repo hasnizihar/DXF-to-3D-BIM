@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "version": "1.0.0",
+  "tolerances_mm": {
+    "endpoint_snap": 25.0,
+    "collinear_distance": 5.0,
+    "collinear_angle_deg": 1.0,
+    "min_wall_thickness": 60.0,
+    "max_wall_thickness": 450.0,
+    "min_wall_length": 200.0,
+    "opening_snap_to_wall": 150.0,
+    "duplicate_line_threshold": 5.0,
+    "polygon_closure_threshold": 30.0
+  }
+}

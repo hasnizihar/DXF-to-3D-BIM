@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "version": "1.0.0",
+  "description": "Configurable layer naming aliases and patterns for CAD to BIM element classification",
+  "categories": {
+    "exterior_wall": {
+      "exact": ["A-WALL-EXTR", "WALL-EXT", "EXT_WALL", "EXTERIOR_WALLS", "WALL_EXT"],
+      "patterns": [".*WALL.*EXT.*", ".*EXT.*WALL.*", ".*WALLS?_EXT.*"]
+    },
+    "interior_wall": {
+      "exact": ["A-WALL-INTR", "WALL-INT", "INT_WALL", "INTERIOR_WALLS", "WALL_INT", "PARTITION"],
+      "patterns": [".*WALL.*INT.*", ".*INT.*WALL.*", ".*PARTITION.*", ".*WALLS?_INT.*"]
+    },
+    "generic_wall": {
+      "exact": ["A-WALL", "WALL", "WALLS", "0-WALL"],
+      "patterns": ["^WALL.*", ".*_WALL$"]
+    },
+    "door": {
+      "exact": ["A-DOOR", "DOOR", "DOORS", "A-DOOR-IDEN"],
+      "patterns": [".*DOOR.*"]
+    },
+    "window": {
+      "exact": ["A-GLAZ", "A-GLAZ-SILL", "A-WIND", "WINDOW", "WINDOWS", "GLAZING"],
+      "patterns": [".*GLAZ.*", ".*WIND.*"]
+    },
+    "slab": {
+      "exact": ["A-FLOR", "A-SLAB", "SLAB", "FLOOR", "CONCRETE_SLAB"],
+      "patterns": [".*SLAB.*", ".*FLOR.*"]
+    },
+    "column": {
+      "exact": ["S-COLS", "A-COLS", "COLUMN", "COLUMNS", "STRUCT_COL"],
+      "patterns": [".*COL.*"]
+    },
+    "annotation_text": {
+      "exact": ["A-ANNO-TEXT", "TEXT", "ROOM_NAMES", "ANNOTATION", "A-TEXT"],
+      "patterns": [".*ANNO.*TEXT.*", ".*ROOM.*NAME.*"]
+    },
+    "annotation_dim": {
+      "exact": ["A-ANNO-DIMS", "DIMS", "DIMENSIONS", "A-DIMS"],
+      "patterns": [".*ANNO.*DIM.*", ".*DIM.*"]
+    }
+  }
+}

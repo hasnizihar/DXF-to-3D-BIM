@@ -1,0 +1,205 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BIMIntermediateModel",
+  "description": "Normalized, engine-independent 3D Building Information Model reconstructed from 2D architectural DXF geometry and user requirements.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "metadata",
+    "status",
+    "units",
+    "levels",
+    "walls",
+    "openings",
+    "floors",
+    "rooms",
+    "assumptions",
+    "approval"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["projectName", "createdAt"],
+      "properties": {
+        "projectName": { "type": "string" },
+        "author": { "type": "string" },
+        "sourceDxfPath": { "type": "string" },
+        "sourceJsonPath": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "awaiting_approval", "approved", "rejected", "built", "failed"]
+    },
+    "units": {
+      "type": "object",
+      "required": ["sourceUnits", "normalizedUnits", "scaleFactor"],
+      "properties": {
+        "sourceUnits": { "type": "string", "enum": ["mm", "cm", "m", "in", "ft", "unspecified"] },
+        "normalizedUnits": { "type": "string", "const": "mm" },
+        "scaleFactor": { "type": "number", "minimum": 0 },
+        "originOffset": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        }
+      }
+    },
+    "levels": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "elevation"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "elevation": { "type": "number" },
+          "height": { "type": "number", "minimum": 0 }
+        }
+      }
+    },
+    "walls": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "classification", "start", "end", "thickness", "height", "levelId"],
+        "properties": {
+          "id": { "type": "string" },
+          "classification": { "type": "string", "enum": ["exterior", "interior"] },
+          "start": {
+            "type": "array",
+            "items": { "type": "number" },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "end": {
+            "type": "array",
+            "items": { "type": "number" },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "thickness": { "type": "number", "minimum": 0 },
+          "height": { "type": "number", "minimum": 0 },
+          "levelId": { "type": "string" },
+          "material": { "type": "string" },
+          "confidence": { "type": "string", "enum": ["high", "medium", "low"] },
+          "sourceEntities": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "openings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "wallId", "center", "width", "height"],
+        "properties": {
+          "id": { "type": "string" },
+          "type": { "type": "string", "enum": ["door", "window"] },
+          "wallId": { "type": "string" },
+          "center": {
+            "type": "array",
+            "items": { "type": "number" },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "width": { "type": "number", "minimum": 0 },
+          "height": { "type": "number", "minimum": 0 },
+          "sillHeight": { "type": "number" },
+          "swing": { "type": "string" },
+          "confidence": { "type": "string", "enum": ["high", "medium", "low"] }
+        }
+      }
+    },
+    "floors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "levelId", "thickness", "boundary"],
+        "properties": {
+          "id": { "type": "string" },
+          "levelId": { "type": "string" },
+          "thickness": { "type": "number", "minimum": 0 },
+          "elevation": { "type": "number" },
+          "boundary": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": { "type": "number" },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "minItems": 3
+          }
+        }
+      }
+    },
+    "rooms": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "levelId"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "levelId": { "type": "string" },
+          "approximateArea": { "type": "number", "minimum": 0 },
+          "labelPosition": {
+            "type": "array",
+            "items": { "type": "number" },
+            "minItems": 2,
+            "maxItems": 2
+          }
+        }
+      }
+    },
+    "roofs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "roofType", "levelId"],
+        "properties": {
+          "id": { "type": "string" },
+          "roofType": { "type": "string", "enum": ["flat", "gable", "hip", "shed"] },
+          "levelId": { "type": "string" },
+          "pitchDegrees": { "type": "number" },
+          "overhang": { "type": "number" }
+        }
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "target", "description", "assumedValue"],
+        "properties": {
+          "id": { "type": "string" },
+          "target": { "type": "string" },
+          "description": { "type": "string" },
+          "assumedValue": {},
+          "status": { "type": "string", "enum": ["unresolved", "approved", "modified"] }
+        }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "required": ["isApproved"],
+      "properties": {
+        "isApproved": { "type": "boolean" },
+        "approvedBy": { "type": "string" },
+        "approvedAt": { "type": "string" },
+        "modelHash": { "type": "string" },
+        "notes": { "type": "string" }
+      }
+    }
+  }
+}
