@@ -36,6 +36,7 @@ class IntermediateBimModel:
         storey_config: Optional[Dict[str, Any]] = None,
         levels_override: Optional[List[Dict[str, Any]]] = None,
         roofs: Optional[List[Dict[str, Any]]] = None,
+        staircases: Optional[List[Dict[str, Any]]] = None,
     ) -> "IntermediateBimModel":
         now_iso = datetime.now(timezone.utc).isoformat()
 
@@ -79,13 +80,18 @@ class IntermediateBimModel:
         # Build floor dicts
         floor_dicts = []
         for fl in floors:
-            floor_dicts.append({
+            f_item = {
                 "id": fl.id,
                 "levelId": fl.level_id,
                 "thickness": fl.thickness,
                 "elevation": fl.elevation,
                 "boundary": [[p[0], p[1]] for p in fl.boundary],
-            })
+            }
+            if hasattr(fl, "openings") and fl.openings:
+                f_item["openings"] = [[[p[0], p[1]] for p in op] for op in fl.openings]
+            elif isinstance(fl, dict) and fl.get("openings"):
+                f_item["openings"] = fl.get("openings")
+            floor_dicts.append(f_item)
 
         # Build room dicts
         room_dicts = []
@@ -226,13 +232,20 @@ class IntermediateBimModel:
 
                 # Replicate floor slab for upper level
                 for fl in base_floors:
-                    floor_dicts.append({
+                    f_rep = {
                         "id": f"{fl['id']}_L{i}",
                         "levelId": f"Level {i}",
                         "thickness": fl.get("thickness", 150.0),
                         "elevation": storey_elev,
                         "boundary": [list(pt) for pt in fl.get("boundary", [])],
-                    })
+                    }
+                    if "openings" in fl:
+                        f_rep["openings"] = [list(o) for o in fl["openings"]]
+                    floor_dicts.append(f_rep)
+
+        if staircases:
+            from dxf_to_3d_bim.stair_engine import ParametricStairEngine
+            floor_dicts = ParametricStairEngine.punch_stairwell_opening_into_floors(floor_dicts, staircases)
 
         model_dict: Dict[str, Any] = {
             "schemaVersion": "1.0.0",
@@ -255,6 +268,7 @@ class IntermediateBimModel:
             "floors": floor_dicts,
             "rooms": room_dicts,
             "roofs": roofs if roofs is not None else [],
+            "staircases": staircases if staircases is not None else [],
             "assumptions": assumptions or [],
             "approval": {
                 "isApproved": False,
@@ -356,6 +370,7 @@ class IntermediateBimModel:
             "floors": floors,
             "rooms": rooms,
             "roofs": [],
+            "staircases": [],
             "assumptions": upstream.get("uncertainties", []),
             "approval": {
                 "isApproved": False,
@@ -398,6 +413,7 @@ class IntermediateBimModel:
         openings = self.data.get("openings", [])
         floors = self.data.get("floors", [])
         roofs = self.data.get("roofs", [])
+        staircases = self.data.get("staircases", [])
 
         for lvl in self.data.get("levels", []):
             lname = lvl.get("name")
@@ -406,6 +422,7 @@ class IntermediateBimModel:
             lvl_ops = [op for op in openings if op.get("levelId") in (lname, lid)]
             lvl_fls = [fl for fl in floors if fl.get("levelId") in (lname, lid)]
             lvl_roofs = [r for r in roofs if r.get("levelId") in (lname, lid)]
+            lvl_stairs = [st for st in staircases if st.get("levelId") in (lname, lid)]
             summary.append({
                 "id": lid,
                 "name": lname,
@@ -416,6 +433,7 @@ class IntermediateBimModel:
                 "openings": len(lvl_ops),
                 "floors": len(lvl_fls),
                 "roofs": len(lvl_roofs),
+                "stairs": len(lvl_stairs),
             })
         return summary
 

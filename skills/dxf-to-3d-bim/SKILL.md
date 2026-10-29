@@ -52,8 +52,11 @@ dxf-to-3d-bim run path\to\plan.dxf --roof-type gable --roof-pitch 30.0 --roof-ov
 # Two-storey building with repeated ground floor and hip roof
 dxf-to-3d-bim run path\to\plan.dxf --storeys 2 --repeat-ground-floor --roof-type hip --roof-pitch 25.0 --out deliverables
 
+# Two-storey building with staircase and gable roof
+dxf-to-3d-bim run path\to\plan.dxf --storeys 2 --repeat-ground-floor --roof-type gable --stairs straight --stair-width 1000 --out deliverables
+
 # Multi-storey with custom storey height or configuration
-dxf-to-3d-bim run path\to\plan.dxf --storeys 3 --storey-height 3200 --repeat-ground-floor --roof-type gable --out deliverables
+dxf-to-3d-bim run path\to\plan.dxf --storeys 3 --storey-height 3200 --repeat-ground-floor --roof-type gable --stairs l_shaped --out deliverables
 ```
 
 ### Headless Automated Run (Non-Interactive)
@@ -89,6 +92,11 @@ flowchart LR
   - Computes exact parametric geometry for **Gable**, **Hip**, **Flat**, and **Shed** roofs.
   - Automatically identifies short-edge gable ends on axis-aligned or rotated rectangular buildings, ridge endpoints, and bearing elevations ($E_{\text{bearing}} = E_{\text{top\_level}} + H_{\text{wall}}$).
   - Positions roofs atop the top occupied storey while treating top datum levels (`roof_datum`) strictly as reference datums.
+- Support **Parametric Staircase Generation & Vertical Circulation**:
+  - Computes code-compliant vertical circulation for **Straight**, **L-shaped** (with quarter-turn landing), and **U-shaped / dog-legged** (with half-turn landing) staircases.
+  - Automatically calculates integer riser count and going reconciling floor-to-floor rise ($H = E_{\text{top}} - E_{\text{base}}$), ensuring riser $\le 190$ mm and going $\ge 250$ mm.
+  - Automatically punches physical stairwell void openings into the destination upper floor slab solid (`IFCARBITRARYPROFILEDEFWITHVOIDS`) preventing floor/stair collisions.
+  - Emits native BIMCraft guardrails and intermediate landings.
 - Produce intermediate model conforming to [`schemas/bim-model.schema.json`](file:///d:/Agent%20Skills/DXF%20to%203D-BIM/skills/dxf-to-3d-bim/schemas/bim-model.schema.json).
 - Refer to [`workflows/reconstruct-geometry.md`](file:///d:/Agent%20Skills/DXF%20to%203D-BIM/skills/dxf-to-3d-bim/workflows/reconstruct-geometry.md).
 
@@ -100,15 +108,16 @@ flowchart LR
 - Refer to [`workflows/approve-model.md`](file:///d:/Agent%20Skills/DXF%20to%203D-BIM/skills/dxf-to-3d-bim/workflows/approve-model.md).
 
 ### Stage 4: BIM Construction (BIMCraft Backend)
-- Execute verified BIMCraft CLI 0.9.0 commands (`wall`, `floor`, `door`, `window`, `roof`, `elevation`, `section`, `render`).
-- Construct elements in strict order: Levels → Walls → Slabs → Hosted Doors/Windows → Roof → Rooms.
+- Execute verified BIMCraft CLI 0.9.0 commands (`wall`, `floor`, `door`, `window`, `roof`, `stair`, `elevation`, `section`, `render`).
+- Construct elements in strict order: Levels → Walls → Slabs (with stairwell voids) → Hosted Doors/Windows → Staircases & Railings → Roof → Rooms.
 - Save native project into `models/<project>.bimcraft` and export standard IFC4 into `models/<project>.ifc`.
 - Render plan preview into `previews/<project>.png`, 3D axonometric into `previews/<project>_3d.png`, and elevations/sections.
 - Refer to [`workflows/generate-bim.md`](file:///d:/Agent%20Skills/DXF%20to%203D-BIM/skills/dxf-to-3d-bim/workflows/generate-bim.md).
 
 ### Stage 5: Validation & Visual QA
 - Independently inspect the generated `.bimcraft` and `.ifc` models using `bimcraft-cli info` and `PureIfcParser`.
-- Verify opening voiding (`IfcRelVoidsElement`), filling (`IfcRelFillsElement`), and storey containment.
+- Verify opening voiding (`IfcRelVoidsElement`), filling (`IfcRelFillsElement`), storey containment (`IfcRelContainedInSpatialStructure`), and staircase aggregation (`IfcRelAggregates` linking `IFCSTAIRFLIGHT`, `IFCSLAB` landings, and `IFCRAILING`).
+- Verify upper floor slab physical void profiles (`IfcArbitraryProfileDefWithVoids`).
 - Generate CAD-to-BIM visual comparison overlay `previews/<project>_comparison_overlay.png`.
 - Produce validation report conforming to [`schemas/validation-report.schema.json`](file:///d:/Agent%20Skills/DXF%20to%203D-BIM/skills/dxf-to-3d-bim/schemas/validation-report.schema.json).
 - Refer to [`workflows/validate-bim.md`](file:///d:/Agent%20Skills/DXF%20to%203D-BIM/skills/dxf-to-3d-bim/workflows/validate-bim.md).

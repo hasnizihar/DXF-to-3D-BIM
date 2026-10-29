@@ -299,3 +299,4 @@ class ParametricRoofEngine:
             (round(max_x, 2), round(max_y, 2)),
             (round(min_x, 2), round(max_y, 2)),
         ]
+

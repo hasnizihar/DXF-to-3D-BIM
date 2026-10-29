@@ -94,6 +94,8 @@ class BimcraftAdapter:
                 "boundary": fl["boundary"],
                 "level": fl.get("levelId", "Level 1"),
             }
+            if "openings" in fl and fl["openings"]:
+                floor_params["openings"] = fl["openings"]
             cmds.append(("floor", floor_params))
 
         # 3. Doors (hosted)
@@ -148,6 +150,26 @@ class BimcraftAdapter:
                     roof_params["gable"] = True
 
             cmds.append(("roof", roof_params))
+
+        # 5b. Staircases
+        for st in d.get("staircases", []):
+            stair_params: Dict[str, Any] = {
+                "start": [float(st["start"][0]), float(st["start"][1])],
+                "end": [float(st["end"][0]), float(st["end"][1])],
+                "level": st.get("levelId", "Level 1"),
+                "top_level": st.get("topLevelId", "Level 2"),
+                "width": float(st.get("width", 1000.0)),
+                "riser": round(float(st.get("actualRiserHeight", 175.0)) + 0.02, 2),
+                "tread": float(st.get("actualGoing", 280.0)),
+                "railings": bool(st.get("railings", True)),
+            }
+            landings = st.get("landings", [])
+            if landings:
+                stair_params["landings"] = [
+                    {"at": int(l.get("atRiser", l.get("at", 8))), "turn": float(l.get("turnDegrees", l.get("turn", 90)))}
+                    for l in landings
+                ]
+            cmds.append(("stair", stair_params))
 
         # 6. Visual Views & Renderings (if configured)
         if views_config:

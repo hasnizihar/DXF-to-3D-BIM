@@ -211,6 +211,74 @@
         }
       }
     },
+    "staircases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "stairType", "levelId", "topLevelId", "start", "end", "width", "totalRise", "riserCount", "actualRiserHeight", "treadCount", "actualGoing"],
+        "properties": {
+          "id": { "type": "string" },
+          "stairType": { "type": "string", "enum": ["straight", "l_shaped", "u_shaped"] },
+          "levelId": { "type": "string" },
+          "topLevelId": { "type": "string" },
+          "baseElevation": { "type": "number" },
+          "topElevation": { "type": "number" },
+          "totalRise": { "type": "number", "minimum": 500 },
+          "start": {
+            "type": "array",
+            "items": { "type": "number" },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "end": {
+            "type": "array",
+            "items": { "type": "number" },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "climbAngleDeg": { "type": "number" },
+          "width": { "type": "number", "minimum": 500 },
+          "riserCount": { "type": "integer", "minimum": 2 },
+          "actualRiserHeight": { "type": "number", "minimum": 100 },
+          "treadCount": { "type": "integer", "minimum": 1 },
+          "actualGoing": { "type": "number", "minimum": 150 },
+          "totalRun": { "type": "number", "minimum": 0 },
+          "landings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["atRiser", "turnDegrees", "elevation"],
+              "properties": {
+                "atRiser": { "type": "integer", "minimum": 1 },
+                "turnDegrees": { "type": "number" },
+                "elevation": { "type": "number" },
+                "dimensions": {
+                  "type": "array",
+                  "items": { "type": "number" },
+                  "minItems": 2,
+                  "maxItems": 2
+                }
+              }
+            }
+          },
+          "railings": { "type": "boolean" },
+          "headroomClearance": { "type": "number", "minimum": 1500 },
+          "stairwellBoundary": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": { "type": "number" },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "minItems": 3
+          },
+          "provenance": { "type": "string", "enum": ["dxf_detected", "user_configured", "synthetic_test"] },
+          "confidence": { "type": "string", "enum": ["high", "medium", "low"] },
+          "approvalStatus": { "type": "string", "enum": ["pending", "approved", "rejected"] }
+        }
+      }
+    },
     "assumptions": {
       "type": "array",
       "items": {

@@ -43,6 +43,18 @@
     "pitch_degrees": 30.0,
     "overhang": 300.0,
     "thickness": 200.0
+  },
+  "stairs": {
+    "enabled": false,
+    "mode": "none",
+    "stair_type": "straight",
+    "width": 1000.0,
+    "target_riser": 175.0,
+    "target_going": 280.0,
+    "max_riser": 190.0,
+    "min_going": 250.0,
+    "min_headroom": 2000.0,
+    "railings": true
   }
 }
 

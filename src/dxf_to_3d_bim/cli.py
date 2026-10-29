@@ -24,6 +24,7 @@ from dxf_to_3d_bim.preflight import PreflightAnalyzer, PreflightStatus, ScaleCon
 from dxf_to_3d_bim.reporting import ReviewSummaryGenerator, compute_file_sha256
 from dxf_to_3d_bim.roof_engine import ParametricRoofEngine
 from dxf_to_3d_bim.room_detection import SpatialDetector
+from dxf_to_3d_bim.stair_engine import ParametricStairEngine
 from dxf_to_3d_bim.validator import ModelValidator
 from dxf_to_3d_bim.wall_reconstruction import WallReconstructor
 
@@ -115,6 +116,15 @@ def reconstruct_dxf_model(
     roof_pitch: float = 30.0,
     roof_overhang: float = 300.0,
     roof_thickness: float = 200.0,
+    stairs_mode: str = "none",
+    stair_type: str = "straight",
+    stair_width: float = 1000.0,
+    target_riser: float = 175.0,
+    target_going: float = 280.0,
+    stair_start: Optional[List[float]] = None,
+    stair_end: Optional[List[float]] = None,
+    stair_railings: bool = True,
+    stair_config_path: Optional[str] = None,
 ) -> IntermediateBimModel:
     """Reconstructs IntermediateBimModel from DXF supporting Mode A (layers) and Mode B (configured/repeated)."""
     if storeys < 1:
@@ -292,6 +302,80 @@ def reconstruct_dxf_model(
         if rf_geom:
             roofs.append(rf_geom.to_dict())
 
+    staircases = []
+    eff_stair_mode = (stairs_mode or "none").strip().lower()
+    if eff_stair_mode in ("straight", "l_shaped", "u_shaped"):
+        stair_type = eff_stair_mode
+        eff_stair_mode = "manual"
+
+    if eff_stair_mode not in ("none", ""):
+        base_lvl = "Level 1"
+        top_lvl = "Level 2" if storeys > 1 else "Level 2"
+        base_elev = ground_elevation
+        top_elev = ground_elevation + storey_height
+
+        if eff_stair_mode == "auto":
+            stair_lines = [l for l in parsed.lines if classifier.is_stair_layer(l.layer)]
+            auto_stair = None
+            if stair_lines:
+                auto_stair = ParametricStairEngine.detect_stairs_from_lines(
+                    stair_lines=stair_lines,
+                    level_id=base_lvl,
+                    top_level_id=top_lvl,
+                    base_elevation=base_elev,
+                    top_elevation=top_elev,
+                )
+            if auto_stair:
+                staircases.append(auto_stair.to_dict())
+            elif storeys > 1:
+                p0 = (1500.0, 1500.0)
+                if floors and hasattr(floors[0], "boundary") and len(floors[0].boundary) > 0:
+                    fb = floors[0].boundary
+                    min_fx = min(p[0] for p in fb)
+                    min_fy = min(p[1] for p in fb)
+                    p0 = (min_fx + 1200.0, min_fy + 1200.0)
+                st_geom = ParametricStairEngine.generate_stair(
+                    stair_id="stair_1",
+                    stair_type=stair_type or "straight",
+                    level_id=base_lvl,
+                    top_level_id=top_lvl,
+                    base_elevation=base_elev,
+                    top_elevation=top_elev,
+                    start_point=p0,
+                    width=stair_width,
+                    target_riser=target_riser,
+                    target_going=target_going,
+                    railings=stair_railings,
+                    provenance="user_configured",
+                )
+                staircases.append(st_geom.to_dict())
+        elif eff_stair_mode in ("manual", "straight", "l_shaped", "u_shaped"):
+            p0 = tuple(stair_start) if stair_start else (1500.0, 1500.0)
+            if not stair_start and floors and hasattr(floors[0], "boundary") and len(floors[0].boundary) > 0:
+                fb = floors[0].boundary
+                min_fx = min(p[0] for p in fb)
+                min_fy = min(p[1] for p in fb)
+                p0 = (min_fx + 1200.0, min_fy + 1200.0)
+
+            p1 = tuple(stair_end) if stair_end else None
+
+            st_geom = ParametricStairEngine.generate_stair(
+                stair_id="stair_1",
+                stair_type=stair_type,
+                level_id=base_lvl,
+                top_level_id=top_lvl,
+                base_elevation=base_elev,
+                top_elevation=top_elev,
+                start_point=p0,
+                end_point=p1,
+                width=stair_width,
+                target_riser=target_riser,
+                target_going=target_going,
+                railings=stair_railings,
+                provenance="user_configured",
+            )
+            staircases.append(st_geom.to_dict())
+
     return IntermediateBimModel.create(
         project_name=Path(dxf_path).stem,
         source_dxf_path=str(Path(dxf_path).resolve()),
@@ -302,6 +386,7 @@ def reconstruct_dxf_model(
         floors=floors,
         rooms=rooms,
         roofs=roofs,
+        staircases=staircases,
         assumptions=assumptions,
         storeys_count=storeys,
         storey_heights=[storey_height] * storeys,
@@ -325,6 +410,12 @@ def prepare(
     roof_pitch: float = typer.Option(30.0, "--roof-pitch", help="Roof pitch in degrees (default 30.0)"),
     roof_overhang: float = typer.Option(300.0, "--roof-overhang", help="Roof eave overhang in mm (default 300.0)"),
     roof_thickness: float = typer.Option(200.0, "--roof-thickness", help="Roof thickness in mm (default 200.0)"),
+    stairs: str = typer.Option("none", "--stairs", help="Stair generation mode: none, auto, straight, l_shaped, u_shaped"),
+    stair_type: str = typer.Option("straight", "--stair-type", help="Stair type: straight, l_shaped, u_shaped"),
+    stair_width: float = typer.Option(1000.0, "--stair-width", help="Stair width in mm (default 1000.0)"),
+    target_riser: float = typer.Option(175.0, "--target-riser", help="Target riser height in mm (default 175.0)"),
+    target_going: float = typer.Option(280.0, "--target-going", help="Target going / tread depth in mm (default 280.0)"),
+    stair_railings: bool = typer.Option(True, "--stair-railings/--no-stair-railings", help="Generate stair guardrails"),
 ):
     """Parses DXF, reconstructs geometry, and creates an intermediate model awaiting approval."""
     if json_path and Path(json_path).exists():
@@ -351,6 +442,12 @@ def prepare(
             roof_pitch=roof_pitch,
             roof_overhang=roof_overhang,
             roof_thickness=roof_thickness,
+            stairs_mode=stairs,
+            stair_type=stair_type,
+            stair_width=stair_width,
+            target_riser=target_riser,
+            target_going=target_going,
+            stair_railings=stair_railings,
         )
 
     saved_path = model.save(output_path)
@@ -472,6 +569,13 @@ def run(
     roof_pitch: float = typer.Option(30.0, "--roof-pitch", help="Roof pitch in degrees (default 30.0)"),
     roof_overhang: float = typer.Option(300.0, "--roof-overhang", help="Roof eave overhang in mm (default 300.0)"),
     roof_thickness: float = typer.Option(200.0, "--roof-thickness", help="Roof thickness in mm (default 200.0)"),
+    stairs: str = typer.Option("none", "--stairs", help="Stair generation mode: none, auto, straight, l_shaped, u_shaped"),
+    stair_type: str = typer.Option("straight", "--stair-type", help="Stair type: straight, l_shaped, u_shaped"),
+    stair_width: float = typer.Option(1000.0, "--stair-width", help="Stair width in mm (default 1000.0)"),
+    target_riser: float = typer.Option(175.0, "--target-riser", help="Target riser height in mm (default 175.0)"),
+    target_going: float = typer.Option(280.0, "--target-going", help="Target going / tread depth in mm (default 280.0)"),
+    stair_railings: bool = typer.Option(True, "--stair-railings/--no-stair-railings", help="Generate stair guardrails"),
+    stair_config: Optional[str] = typer.Option(None, "--stair-config", help="Path to custom stair configuration JSON"),
     non_interactive: bool = typer.Option(False, "--non-interactive", help="Run without terminal prompts (requires config or auto-approve)"),
     auto_approve: bool = typer.Option(False, "--auto-approve", help="Simulate human approval for automated headless testing"),
     views: bool = typer.Option(True, "--views/--no-views", help="Generate 3D isometric, elevation, and section views"),
@@ -583,6 +687,20 @@ def run(
         eff_roof_overhang = cfg.roof.overhang
         eff_roof_thickness = cfg.roof.thickness
 
+    eff_stairs_mode = stairs
+    eff_stair_type = stair_type
+    eff_stair_width = stair_width
+    eff_target_riser = target_riser
+    eff_target_going = target_going
+    eff_stair_railings = stair_railings
+    if eff_stairs_mode == "none" and cfg.stairs.enabled:
+        eff_stairs_mode = cfg.stairs.mode or "auto"
+        eff_stair_type = cfg.stairs.stair_type
+        eff_stair_width = cfg.stairs.width
+        eff_target_riser = cfg.stairs.target_riser
+        eff_target_going = cfg.stairs.target_going
+        eff_stair_railings = cfg.stairs.railings
+
     try:
         model = reconstruct_dxf_model(
             dxf_path=input_path,
@@ -600,6 +718,13 @@ def run(
             roof_pitch=eff_roof_pitch,
             roof_overhang=eff_roof_overhang,
             roof_thickness=eff_roof_thickness,
+            stairs_mode=eff_stairs_mode,
+            stair_type=eff_stair_type,
+            stair_width=eff_stair_width,
+            target_riser=eff_target_riser,
+            target_going=eff_target_going,
+            stair_railings=eff_stair_railings,
+            stair_config_path=stair_config or cfg.stairs.stair_config_path,
         )
     except Exception as e:
         console.print(f"[bold red]Reconstruction error:[/bold red] {e}")

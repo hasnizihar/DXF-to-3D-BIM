@@ -80,6 +80,20 @@ class RoofConfig(BaseModel):
     thickness: float = 200.0
 
 
+class StairsConfig(BaseModel):
+    enabled: bool = False
+    mode: str = "none"  # "none", "auto", "manual"
+    stair_type: str = "straight"  # "straight", "l_shaped", "u_shaped"
+    width: float = 1000.0
+    target_riser: float = 175.0
+    target_going: float = 280.0
+    max_riser: float = 190.0
+    min_going: float = 250.0
+    min_headroom: float = 2000.0
+    railings: bool = True
+    stair_config_path: Optional[str] = None
+
+
 class TolerancesConfig(BaseModel):
     endpoint_snap: float = 25.0
     collinear_distance: float = 5.0
@@ -101,6 +115,7 @@ class ProjectConfig(BaseModel):
     openings: OpeningsConfig = Field(default_factory=OpeningsConfig)
     slab: SlabConfig = Field(default_factory=SlabConfig)
     roof: RoofConfig = Field(default_factory=RoofConfig)
+    stairs: StairsConfig = Field(default_factory=StairsConfig)
     tolerances: TolerancesConfig = Field(default_factory=TolerancesConfig)
     layer_aliases: Optional[Dict[str, Any]] = None
     ignored_layers: List[str] = Field(default_factory=list)

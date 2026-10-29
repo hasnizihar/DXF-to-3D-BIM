@@ -140,9 +140,14 @@ class IfcSemanticInspection:
     openings: Dict[str, List[Dict[str, Any]]]
     slabs: List[Dict[str, Any]]
     roofs: List[Dict[str, Any]] = field(default_factory=list)
+    stairs: List[Dict[str, Any]] = field(default_factory=list)
+    stair_flights: List[Dict[str, Any]] = field(default_factory=list)
+    railings: List[Dict[str, Any]] = field(default_factory=list)
     voids_verified: bool = False
     fills_verified: bool = False
     containment_verified: bool = False
+    stair_aggregates_verified: bool = False
+    has_slab_voids: bool = False
     contained_by_storey: Dict[str, List[int]] = field(default_factory=dict)
     details: List[str] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
@@ -216,6 +221,10 @@ class PureIfcParser:
         window_entities = self.get_entities_by_type("IFCWINDOW")
         slab_entities = self.get_entities_by_type("IFCSLAB")
         roof_entities = self.get_entities_by_type("IFCROOF")
+        stair_entities = self.get_entities_by_type("IFCSTAIR")
+        flight_entities = self.get_entities_by_type("IFCSTAIRFLIGHT")
+        railing_entities = self.get_entities_by_type("IFCRAILING")
+        void_profile_entities = self.get_entities_by_type("IFCARBITRARYPROFILEDEFWITHVOIDS")
         opening_entities = self.get_entities_by_type("IFCOPENINGELEMENT")
         storey_entities = self.get_entities_by_type("IFCBUILDINGSTOREY")
 
@@ -225,6 +234,9 @@ class PureIfcParser:
             "window": len(window_entities),
             "slab": len(slab_entities),
             "roof": len(roof_entities),
+            "stair": len(stair_entities),
+            "stair_flight": len(flight_entities),
+            "railing": len(railing_entities),
             "opening_element": len(opening_entities),
             "storey": len(storey_entities),
         }
@@ -259,7 +271,7 @@ class PureIfcParser:
                 if structure_id:
                     contained_by_storey[structure_id] = elem_ids
 
-        all_primary_ids = {e.id for e in (wall_entities + door_entities + window_entities + slab_entities + roof_entities)}
+        all_primary_ids = {e.id for e in (wall_entities + door_entities + window_entities + slab_entities + roof_entities + stair_entities)}
         containment_verified = all_primary_ids.issubset(contained_element_ids) if all_primary_ids else True
         if containment_verified and all_primary_ids:
             details.append(f"Spatial containment verified: All {len(all_primary_ids)} primary building elements are linked to building storeys.")
@@ -378,6 +390,78 @@ class PureIfcParser:
                 "contained_in_storey": host_st,
             })
 
+        # 8. Extract Stair Details & Aggregation
+        agg_rels = self.get_entities_by_type("IFCRELAGGREGATES")
+        stair_aggregates: Dict[int, List[int]] = {}
+        for ar in agg_rels:
+            if len(ar.args) >= 6:
+                parent_id = ar.args[4]
+                children = ar.args[5]
+                if isinstance(children, (list, tuple)):
+                    child_ids = [c for c in children if isinstance(c, int)]
+                    if isinstance(parent_id, int):
+                        stair_aggregates[parent_id] = child_ids
+
+        stairs = []
+        for st in stair_entities:
+            predef = st.args[8] if len(st.args) > 8 else None
+            predef_str = str(predef).strip(".").upper() if predef else "NOTDEFINED"
+            host_st = None
+            for st_name, elem_list in contained_by_storey_named.items():
+                if st.id in elem_list:
+                    host_st = st_name
+                    break
+            aggs = stair_aggregates.get(st.id, [])
+            stairs.append({
+                "id": st.id,
+                "name": st.args[2] if len(st.args) > 2 and isinstance(st.args[2], str) else "Stair",
+                "predefined_type": predef_str,
+                "contained_in_storey": host_st,
+                "aggregated_elements": aggs,
+            })
+
+        stair_aggregates_verified = True
+        if stair_entities:
+            for s in stairs:
+                if not s["aggregated_elements"]:
+                    stair_aggregates_verified = False
+            if stair_aggregates_verified:
+                details.append(
+                    f"Stair aggregation verified: All {len(stair_entities)} IFCSTAIR entities aggregate flight/landing components."
+                )
+
+        flights = []
+        for fl in flight_entities:
+            # IFCSTAIRFLIGHT: (..., NumberOfRisers, NumberOfTreads, RiserHeight, TreadLength, PredefinedType)
+            n_risers = int(fl.args[8]) if len(fl.args) > 8 and isinstance(fl.args[8], (int, float)) else 0
+            n_treads = int(fl.args[9]) if len(fl.args) > 9 and isinstance(fl.args[9], (int, float)) else 0
+            riser_h = float(fl.args[10]) if len(fl.args) > 10 and isinstance(fl.args[10], (int, float)) else 0.0
+            tread_l = float(fl.args[11]) if len(fl.args) > 11 and isinstance(fl.args[11], (int, float)) else 0.0
+            flights.append({
+                "id": fl.id,
+                "name": fl.args[2] if len(fl.args) > 2 and isinstance(fl.args[2], str) else "Flight",
+                "riser_count": n_risers,
+                "tread_count": n_treads,
+                "riser_height": riser_h,
+                "tread_length": tread_l,
+            })
+
+        railings = []
+        for rl in railing_entities:
+            predef = rl.args[8] if len(rl.args) > 8 else None
+            predef_str = str(predef).strip(".").upper() if predef else "GUARDRAIL"
+            railings.append({
+                "id": rl.id,
+                "name": rl.args[2] if len(rl.args) > 2 and isinstance(rl.args[2], str) else "Railing",
+                "predefined_type": predef_str,
+            })
+
+        has_slab_voids = len(void_profile_entities) > 0
+        if has_slab_voids:
+            details.append(
+                f"Floor slab voids verified: Found {len(void_profile_entities)} IFCARBITRARYPROFILEDEFWITHVOIDS profile(s) cutting stairwell opening(s)."
+            )
+
         return IfcSemanticInspection(
             file_path=str(self.ifc_path),
             schema=self.schema,
@@ -387,9 +471,14 @@ class PureIfcParser:
             openings={"doors": doors, "windows": windows},
             slabs=[{"id": s.id} for s in slab_entities],
             roofs=roofs,
+            stairs=stairs,
+            stair_flights=flights,
+            railings=railings,
             voids_verified=voids_verified,
             fills_verified=fills_verified,
             containment_verified=containment_verified,
+            stair_aggregates_verified=stair_aggregates_verified,
+            has_slab_voids=has_slab_voids,
             contained_by_storey=contained_by_storey_named,
             details=details,
             warnings=self.warnings,

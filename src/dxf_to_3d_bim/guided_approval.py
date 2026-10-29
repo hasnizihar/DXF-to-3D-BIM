@@ -127,6 +127,34 @@ class GuidedApprovalSession:
             t_roof.add_row("Roof Plan Area", f"{rf.get('areaM2', 0.0):.2f} m²")
             self.console.print(t_roof)
 
+        # Section 5c: Staircase & Vertical Circulation (if configured)
+        staircases = self.model.data.get("staircases", [])
+        if staircases:
+            st = staircases[0]
+            t_stair = Table(title="Section 5c: Staircase & Vertical Circulation Specification")
+            t_stair.add_column("Parameter", style="cyan")
+            t_stair.add_column("Approved Value", style="green")
+            t_stair.add_row("Stair Type", st.get("stairType", "straight").upper())
+            t_stair.add_row("Levels Connected", f"{st.get('levelId')} -> {st.get('topLevelId')}")
+            t_stair.add_row("Total Rise", f"{st.get('totalRise', 0.0):.1f} mm")
+            t_stair.add_row(
+                "Risers / Treads",
+                f"{st.get('riserCount')} risers @ {st.get('actualRiserHeight', 0.0):.1f} mm / "
+                f"{st.get('treadCount')} treads @ {st.get('actualGoing', 0.0):.1f} mm"
+            )
+            t_stair.add_row("Flight Width", f"{st.get('width', 1000.0):.1f} mm")
+            t_stair.add_row("Total Horizontal Run", f"{st.get('totalRun', 0.0):.1f} mm")
+            t_stair.add_row("Headroom Clearance", f"{st.get('headroomClearance', 2000.0):.1f} mm")
+            t_stair.add_row(
+                "Upper Slab Opening",
+                f"{st.get('stairwellAreaM2', 0.0):.2f} m² void cut in {st.get('topLevelId')}"
+            )
+            landings = st.get("landings", [])
+            if landings:
+                l_desc = f"{len(landings)} landing(s) (turn: {landings[0].get('turnDegrees', 0)}° at riser {landings[0].get('atRiser')})"
+                t_stair.add_row("Intermediate Landings", l_desc)
+            self.console.print(t_stair)
+
         # Section 6: Warnings & Uncertainties
         t6 = Table(title="Section 6: Uncertain Geometry & Preflight Warnings")
         t6.add_column("Item", style="yellow")
@@ -199,6 +227,40 @@ class GuidedApprovalSession:
             rf["ridgeElevation"] = round(recomputed.ridge_elevation, 2)
             rf["gableEdgeIndices"] = recomputed.gable_edge_indices
             rf["areaM2"] = round(recomputed.area_m2, 2)
+
+    def update_stair_parameters(
+        self,
+        width: Optional[float] = None,
+        target_riser: Optional[float] = None,
+        target_going: Optional[float] = None,
+    ):
+        staircases = self.model.data.get("staircases", [])
+        if not staircases:
+            return
+        st = staircases[0]
+        w = width if width is not None else st.get("width", 1000.0)
+        from dxf_to_3d_bim.stair_engine import ParametricStairEngine
+        recomputed = ParametricStairEngine.generate_stair(
+            stair_id=st.get("id", "stair_1"),
+            stair_type=st.get("stairType", "straight"),
+            level_id=st.get("levelId", "Level 1"),
+            top_level_id=st.get("topLevelId", "Level 2"),
+            base_elevation=st.get("baseElevation", 0.0),
+            top_elevation=st.get("topElevation", 3000.0),
+            start_point=tuple(st.get("start", [1000.0, 1000.0])),
+            end_point=None,
+            direction_angle_deg=st.get("climbAngleDeg", 0.0),
+            width=w,
+            target_riser=target_riser if target_riser is not None else st.get("actualRiserHeight", 175.0),
+            target_going=target_going if target_going is not None else st.get("actualGoing", 280.0),
+            railings=st.get("railings", True),
+            provenance="user_configured",
+        )
+        staircases[0] = recomputed.to_dict()
+        # Re-punch floor openings
+        self.model.data["floors"] = ParametricStairEngine.punch_stairwell_opening_into_floors(
+            self.model.data.get("floors", []), staircases
+        )
 
     def run_guided_session(
         self,

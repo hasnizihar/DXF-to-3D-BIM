@@ -33,7 +33,10 @@
             "doors": { "type": "integer" },
             "windows": { "type": "integer" },
             "levels": { "type": "integer" },
-            "roofs": { "type": "integer" }
+            "roofs": { "type": "integer" },
+            "stairs": { "type": "integer" },
+            "stair_flights": { "type": "integer" },
+            "railings": { "type": "integer" }
           }
         },
         "generated": {
@@ -43,7 +46,10 @@
             "doors": { "type": "integer" },
             "windows": { "type": "integer" },
             "levels": { "type": "integer" },
-            "roofs": { "type": "integer" }
+            "roofs": { "type": "integer" },
+            "stairs": { "type": "integer" },
+            "stair_flights": { "type": "integer" },
+            "railings": { "type": "integer" }
           }
         }
       }

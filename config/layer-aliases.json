@@ -23,6 +23,10 @@
       "exact": ["A-GLAZ", "A-GLAZ-SILL", "A-WIND", "WINDOW", "WINDOWS", "GLAZING"],
       "patterns": [".*GLAZ.*", ".*WIND.*"]
     },
+    "stair": {
+      "exact": ["A-FLOR-STRS", "A-STRS", "STAIR", "STAIRS", "STCASE", "S-STAIR", "STAIRWELL"],
+      "patterns": [".*STAIR.*", ".*STRS.*", ".*STCASE.*"]
+    },
     "slab": {
       "exact": ["A-FLOR", "A-SLAB", "SLAB", "FLOOR", "CONCRETE_SLAB"],
       "patterns": [".*SLAB.*", ".*FLOR.*"]

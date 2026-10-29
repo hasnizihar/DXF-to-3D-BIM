@@ -106,3 +106,7 @@ class LayerClassifier:
     def is_slab_layer(self, layer_name: str) -> bool:
         return self.classify(layer_name) == "slab"
 
+    def is_stair_layer(self, layer_name: str) -> bool:
+        return self.classify(layer_name) == "stair"
+
+

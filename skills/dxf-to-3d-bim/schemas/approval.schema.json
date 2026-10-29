@@ -29,7 +29,14 @@
         "roofPitch": { "type": "number" },
         "roofOverhang": { "type": "number" },
         "roofThickness": { "type": "number" },
-        "roofBaseElevation": { "type": "number" }
+        "roofBaseElevation": { "type": "number" },
+        "staircaseCount": { "type": "integer" },
+        "stairType": { "type": "string" },
+        "stairWidth": { "type": "number" },
+        "riserCount": { "type": "integer" },
+        "riserHeight": { "type": "number" },
+        "going": { "type": "number" },
+        "stairwellOpeningM2": { "type": "number" }
       }
     },
     "notes": { "type": "string" }

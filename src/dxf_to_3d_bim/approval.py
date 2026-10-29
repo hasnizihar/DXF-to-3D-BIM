@@ -49,6 +49,7 @@ class ApprovalGate:
         openings = d.get("openings", [])
         floors = d.get("floors", [])
         roofs = d.get("roofs", [])
+        staircases = d.get("staircases", [])
         assumptions = d.get("assumptions", [])
 
         ext_walls = [w for w in walls if w.get("classification") == "exterior"]
@@ -84,6 +85,15 @@ class ApprovalGate:
             vert_params["roof_overhang_mm"] = r0.get("overhang", 300.0)
             vert_params["roof_thickness_mm"] = r0.get("thickness", 200.0)
             vert_params["roof_base_elevation_mm"] = r0.get("baseElevation", 0.0)
+        if staircases:
+            s0 = staircases[0]
+            vert_params["stair_type"] = s0.get("stairType", "straight")
+            vert_params["stair_count"] = len(staircases)
+            vert_params["stair_width_mm"] = s0.get("width", 1000.0)
+            vert_params["stair_riser_count"] = s0.get("riserCount", 17)
+            vert_params["stair_riser_height_mm"] = s0.get("actualRiserHeight", 176.5)
+            vert_params["stair_going_mm"] = s0.get("actualGoing", 280.0)
+            vert_params["stairwell_opening_m2"] = s0.get("stairwellAreaM2", 0.0)
 
         return {
             "projectName": d.get("metadata", {}).get("projectName", "Project"),
@@ -100,6 +110,7 @@ class ApprovalGate:
                 "windows": len(windows),
                 "floors": len(floors),
                 "roofs": len(roofs),
+                "staircases": len(staircases),
             },
             "proposed_vertical_parameters": vert_params,
             "uncertainties": assumptions,
@@ -150,6 +161,14 @@ class ApprovalGate:
             approved_params["roofOverhang"] = vert["roof_overhang_mm"]
             approved_params["roofThickness"] = vert["roof_thickness_mm"]
             approved_params["roofBaseElevation"] = vert["roof_base_elevation_mm"]
+        if "stair_type" in vert:
+            approved_params["staircaseCount"] = vert.get("stair_count", 1)
+            approved_params["stairType"] = vert["stair_type"]
+            approved_params["stairWidth"] = vert["stair_width_mm"]
+            approved_params["riserCount"] = vert["stair_riser_count"]
+            approved_params["riserHeight"] = vert["stair_riser_height_mm"]
+            approved_params["going"] = vert["stair_going_mm"]
+            approved_params["stairwellOpeningM2"] = vert["stairwell_opening_m2"]
 
         approval_record: Dict[str, Any] = {
             "projectName": model.data.get("metadata", {}).get("projectName", "Project"),

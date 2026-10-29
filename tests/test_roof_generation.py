@@ -352,3 +352,4 @@ def test_live_bimcraft_and_ifc_roof_generation(tmp_path):
     p_dir = tmp_path / "deliverables"
     assert (p_dir / "liverooftest_3d.png").exists()
     assert (p_dir / "liverooftest_section_a.png").exists()
+

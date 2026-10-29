@@ -247,6 +247,89 @@ class ModelValidator:
                     "details": f"Roof is contained in host storey '{actual_host}' (expected '{host_level_id}')",
                 })
 
+        # Staircase Element Count & Component Checks
+        expected_stairs = len(model.data.get("staircases", []))
+        gen_stairs = actual_counts.get("stair", 0)
+        stair_diff = abs(gen_stairs - expected_stairs)
+
+        expected_flights = 0
+        expected_railings = 0
+        for st in model.data.get("staircases", []):
+            st_type = st.get("stairType", "straight")
+            if st_type == "straight":
+                expected_flights += 1
+            else:
+                expected_flights += 2
+            if st.get("railings", True):
+                expected_railings += 2
+
+        gen_flights = actual_counts.get("stair_flight", 0)
+        gen_railings = actual_counts.get("railing", 0)
+
+        if expected_stairs > 0 or gen_stairs > 0:
+            checks.append({
+                "category": "Vertical Circulation",
+                "name": "Staircase Element Count",
+                "status": "PASSED" if stair_diff == 0 else "WARNING",
+                "details": f"Expected {expected_stairs} staircase(s), found {gen_stairs} in IFC",
+                "numericalDifference": float(stair_diff),
+            })
+
+            # Check Stair predefined type
+            if expected_stairs > 0 and ifc_sem and ifc_sem.stairs:
+                m_stair = model.data.get("staircases", [])[0]
+                m_type = m_stair.get("stairType", "straight")
+                ifc_type = ifc_sem.stairs[0].get("predefined_type", "")
+                type_ok = False
+                if m_type == "straight" and "STRAIGHT" in ifc_type:
+                    type_ok = True
+                elif m_type == "l_shaped" and ("QUARTER" in ifc_type or "L" in ifc_type):
+                    type_ok = True
+                elif m_type == "u_shaped" and ("HALF" in ifc_type or "U" in ifc_type):
+                    type_ok = True
+                checks.append({
+                    "category": "Vertical Circulation",
+                    "name": "Staircase Predefined Type",
+                    "status": "PASSED" if type_ok else "WARNING",
+                    "details": f"Expected {m_type.upper()}_STAIR, found {ifc_type} in IFC",
+                })
+
+                # Check aggregates
+                checks.append({
+                    "category": "Vertical Circulation",
+                    "name": "Stair Aggregation Integrity",
+                    "status": "PASSED" if ifc_sem.stair_aggregates_verified else "WARNING",
+                    "details": "IFCSTAIR properly aggregates flights, landings, and guardrails via IfcRelAggregates",
+                })
+
+                # Check riser and tread match
+                if ifc_sem.stair_flights:
+                    exp_r = m_stair.get("actualRiserHeight", 175.0)
+                    exp_g = m_stair.get("actualGoing", 280.0)
+                    act_r = ifc_sem.stair_flights[0].get("riser_height", 0.0)
+                    act_g = ifc_sem.stair_flights[0].get("tread_length", 0.0)
+                    r_diff = abs(act_r - exp_r)
+                    g_diff = abs(act_g - exp_g)
+                    checks.append({
+                        "category": "Vertical Circulation",
+                        "name": "Riser / Tread Dimensions",
+                        "status": "PASSED" if (r_diff < 1.0 and g_diff < 1.0) else "WARNING",
+                        "details": f"Riser: expected {exp_r:.1f} mm, found {act_r:.1f} mm; Tread: expected {exp_g:.1f} mm, found {act_g:.1f} mm",
+                    })
+
+                # Check upper slab opening cut
+                floors = model.data.get("floors", [])
+                top_floor = next((fl for fl in floors if fl.get("levelId") == m_stair.get("topLevelId")), None)
+                has_model_void = bool(top_floor and top_floor.get("openings"))
+                has_ifc_void = getattr(ifc_sem, "has_slab_voids", False)
+                slab_cut_ok = has_model_void and has_ifc_void
+                checks.append({
+                    "category": "Vertical Circulation",
+                    "name": "Stairwell Floor Slab Opening",
+                    "status": "PASSED" if slab_cut_ok else "WARNING",
+                    "details": f"Upper floor slab '{m_stair.get('topLevelId')}' has void opening punched (model: {has_model_void}, IFC: {has_ifc_void})",
+                })
+
         # Storey Count Check
         if gen_levels > 0:
             level_diff = abs(gen_levels - expected_levels)
@@ -295,6 +378,9 @@ class ModelValidator:
                     "windows": expected_windows,
                     "levels": expected_levels,
                     "roofs": expected_roofs,
+                    "stairs": expected_stairs,
+                    "stair_flights": expected_flights,
+                    "railings": expected_railings,
                 },
                 "generated": {
                     "walls": gen_walls,
@@ -302,6 +388,9 @@ class ModelValidator:
                     "windows": gen_windows,
                     "levels": gen_levels,
                     "roofs": gen_roofs,
+                    "stairs": gen_stairs,
+                    "stair_flights": gen_flights,
+                    "railings": gen_railings,
                 },
             },
             "deliverables": {

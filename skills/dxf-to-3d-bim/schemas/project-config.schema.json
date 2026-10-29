@@ -66,6 +66,22 @@
         "thickness": { "type": "number", "minimum": 0 }
       }
     },
+    "stairs": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "mode": { "type": "string", "enum": ["auto", "manual", "none"] },
+        "stair_type": { "type": "string", "enum": ["straight", "l_shaped", "u_shaped"] },
+        "width": { "type": "number", "minimum": 500 },
+        "target_riser": { "type": "number", "minimum": 100, "maximum": 250 },
+        "target_going": { "type": "number", "minimum": 200, "maximum": 400 },
+        "max_riser": { "type": "number", "minimum": 120, "maximum": 250 },
+        "min_going": { "type": "number", "minimum": 200, "maximum": 400 },
+        "min_headroom": { "type": "number", "minimum": 1800 },
+        "railings": { "type": "boolean" },
+        "stair_config_path": { "type": "string" }
+      }
+    },
     "tolerances": {
       "type": "object",
       "properties": {
